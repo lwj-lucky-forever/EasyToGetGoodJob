@@ -1,0 +1,3 @@
+# Local mock account used by the bundled development sign-in flow.
+# Copy this file to .dev.vars before running the app locally.
+OWNER_USER_ID=local_seedy

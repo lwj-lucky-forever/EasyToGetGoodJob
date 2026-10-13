@@ -1,0 +1,85 @@
+"use client";
+
+import { useEffect, useState } from "react";
+import { Download, MonitorSmartphone, Share } from "lucide-react";
+
+import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+
+type InstallPromptEvent = Event & {
+  prompt: () => Promise<void>;
+  userChoice: Promise<{ outcome: "accepted" | "dismissed"; platform: string }>;
+};
+
+function isStandalone() {
+  if (typeof window === "undefined") return false;
+  return window.matchMedia("(display-mode: standalone)").matches || Boolean((navigator as Navigator & { standalone?: boolean }).standalone);
+}
+
+export function PwaInstallButton() {
+  const [promptEvent, setPromptEvent] = useState<InstallPromptEvent | null>(null);
+  const [installed, setInstalled] = useState(false);
+  const [helpOpen, setHelpOpen] = useState(false);
+  const [isIos, setIsIos] = useState(false);
+
+  useEffect(() => {
+    setInstalled(isStandalone());
+    setIsIos(/iphone|ipad|ipod/i.test(navigator.userAgent));
+
+    const onPrompt = (event: Event) => {
+      event.preventDefault();
+      setPromptEvent(event as InstallPromptEvent);
+    };
+    const onInstalled = () => {
+      setInstalled(true);
+      setPromptEvent(null);
+      setHelpOpen(false);
+    };
+
+    window.addEventListener("beforeinstallprompt", onPrompt);
+    window.addEventListener("appinstalled", onInstalled);
+    return () => {
+      window.removeEventListener("beforeinstallprompt", onPrompt);
+      window.removeEventListener("appinstalled", onInstalled);
+    };
+  }, []);
+
+  if (installed) return null;
+
+  async function install() {
+    if (!promptEvent) {
+      setHelpOpen(true);
+      return;
+    }
+    await promptEvent.prompt();
+    const choice = await promptEvent.userChoice;
+    if (choice.outcome === "accepted") setInstalled(true);
+    setPromptEvent(null);
+  }
+
+  return <>
+    <Button
+      type="button"
+      variant="outline"
+      onClick={() => void install()}
+      className="fixed bottom-[calc(1rem+env(safe-area-inset-bottom))] right-4 z-40 h-11 rounded-full border-indigo-200 bg-white px-4 text-indigo-700 shadow-xl shadow-slate-900/15 hover:bg-indigo-50 hover:text-indigo-800 sm:static sm:h-10 sm:rounded-xl sm:border-white/20 sm:bg-white/5 sm:text-white sm:shadow-none sm:hover:bg-white/10 sm:hover:text-white"
+      aria-label="安装 EasyToGetGoodJob"
+    >
+      <Download className="size-4" />
+      <span>安装 App</span>
+    </Button>
+    <Dialog open={helpOpen} onOpenChange={setHelpOpen}>
+      <DialogContent className="max-w-md rounded-[1.5rem]">
+        <DialogHeader>
+          <div className="mb-2 grid size-12 place-items-center rounded-2xl bg-indigo-50 text-indigo-600"><MonitorSmartphone className="size-6" /></div>
+          <DialogTitle>安装 EasyToGetGoodJob</DialogTitle>
+          <DialogDescription className="pt-2 text-left text-sm leading-6 text-slate-600">
+            {isIos
+              ? <>请使用 Safari 打开当前网页，点击底部的<span className="mx-1 inline-flex items-center gap-1 font-semibold text-slate-900"><Share className="size-4" />分享</span>，选择“添加到主屏幕”，再确认添加。</>
+              : <>当前浏览器没有弹出自动安装窗口。请打开浏览器菜单，选择“安装应用”或“添加到主屏幕”；电脑端建议使用 Chrome 或 Edge。</>}
+          </DialogDescription>
+        </DialogHeader>
+      </DialogContent>
+    </Dialog>
+  </>;
+}
