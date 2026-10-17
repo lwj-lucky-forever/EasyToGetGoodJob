@@ -1,0 +1,39 @@
+{
+  "code": 0,
+  "data": {
+    "job_post_detail": {
+      "id": "7694244084009421092",
+      "title": "产品经理实习生-2027届",
+      "city_info": {
+        "code": "CT_11",
+        "name": "北京",
+        "en_name": "Beijing",
+        "i18n_name": "Beijing"
+      },
+      "recruit_type": {
+        "id": "202",
+        "name": "实习",
+        "en_name": "Intern",
+        "i18n_name": "Intern",
+        "depth": 2,
+        "parent": {
+          "id": "2",
+          "name": "校招",
+          "en_name": "Campus",
+          "i18n_name": "Campus",
+          "depth": 1,
+          "children": [],
+          "active_status": 1,
+          "selectability": 1
+        },
+        "children": [],
+        "active_status": 1,
+        "selectability": 1
+      },
+      "publish_time": 1791456080788,
+      "channel_online_status": 1,
+      "description": "1、在指导下完成社区类产品的需求分析、产品设计、文档撰写、项目推进、数据分析等产品工作；能够熟练运用主流AI工具辅助撰写PRD文档，提升工作效率。",
+      "requirement": "1、【必备要求】有不少于 2 家互联网公司产品实习经验，熟悉产品工作流程。\n5、实习期 4-6 个月为佳，不接受低于 3 个月的短期实习。"
+    }
+  }
+}

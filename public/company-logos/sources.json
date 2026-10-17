@@ -1,0 +1,90 @@
+{
+  "retrievedAt": "2026-10-16",
+  "note": "Official website logos and favicons. Trademarks belong to their respective owners.",
+  "logos": [
+    {
+      "id": "bytedance",
+      "website": "https://www.bytedance.com/",
+      "source": "https://www.bytedance.com/ (inline favicon)",
+      "file": "bytedance.png"
+    },
+    {
+      "id": "baidu",
+      "website": "https://www.baidu.com/",
+      "source": "https://www.baidu.com/favicon.ico",
+      "file": "baidu.ico"
+    },
+    {
+      "id": "xiaomi",
+      "website": "https://www.mi.com/",
+      "source": "https://s01.mifile.cn/favicon.ico",
+      "file": "xiaomi.ico"
+    },
+    {
+      "id": "meituan",
+      "website": "https://www.meituan.com/",
+      "source": "https://s3plus.meituan.net/v1/mss_e2821d7f0cfe4ac1bf9202ecf9590e67/cdn-prod/file:1040877d/favicon-mt.ico",
+      "file": "meituan.ico"
+    },
+    {
+      "id": "alibaba",
+      "website": "https://www.alibabagroup.com/",
+      "source": "https://static.alibabagroup.com/static/favicon.ico",
+      "file": "alibaba.jpg"
+    },
+    {
+      "id": "tencent",
+      "website": "https://www.tencent.com/",
+      "source": "https://www.tencent.com/wp-content/uploads/2024/05/logo@2x-en.png",
+      "file": "tencent-wordmark.png"
+    },
+    {
+      "id": "jd",
+      "website": "https://www.jd.com/",
+      "source": "https://storage.360buyimg.com/retail-mall/mall-common-component/favicon.ico",
+      "file": "jd.ico"
+    },
+    {
+      "id": "didi",
+      "website": "https://www.didiglobal.com/",
+      "source": "https://website.didiglobal.com/DDlogo.ico",
+      "file": "didi.ico"
+    },
+    {
+      "id": "xiaohongshu",
+      "website": "https://job.xiaohongshu.com/",
+      "source": "https://www.xiaohongshu.com/favicon.ico",
+      "file": "xiaohongshu.ico"
+    },
+    {
+      "id": "huawei",
+      "website": "https://www.huawei.com/",
+      "source": "https://www.huawei.com/-/media/htemplate-home/1.0.1.20251205144752/components/assets/img/favicon-logo.svg",
+      "file": "huawei.svg"
+    },
+    {
+      "id": "pinduoduo",
+      "website": "https://www.pinduoduo.com/",
+      "source": "https://www.pinduoduo.com/favicon.png",
+      "file": "pinduoduo.png"
+    },
+    {
+      "id": "kuaishou",
+      "website": "https://www.kuaishou.com/",
+      "source": "https://p66-plat.wskwai.com/udata/pkg/WEB-LIVE/kwai_icon.8f6787d8.ico",
+      "file": "kuaishou.ico"
+    },
+    {
+      "id": "netease",
+      "website": "https://hr.163.com/",
+      "source": "https://hr.163.com/favicon.ico",
+      "file": "netease.ico"
+    },
+    {
+      "id": "bilibili",
+      "website": "https://www.bilibili.com/",
+      "source": "https://i0.hdslb.com/bfs/static/jinkela/long/images/favicon.ico",
+      "file": "bilibili-icon.ico"
+    }
+  ]
+}
