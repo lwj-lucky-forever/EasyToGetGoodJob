@@ -108,7 +108,7 @@ export function PipelineHub({ jobs, stage, ...actions }: Props) {
   const items = current ? jobs.filter(job => pipelineStageFor(job.status) === current.slug) : [];
   return <div className="pipeline-hub">
     {!current ? <>
-      <section className="pipeline-hero"><span className="pipeline-hero-orb" aria-hidden="true" /><p className="pipeline-eyebrow">EVERY STEP COUNTS</p><h2>把每一步准备，<br /><span>变成下一次机会。</span></h2><p>六个阶段，六种专注。选一个阶段，处理眼前最重要的事。</p><span className="pipeline-hero-note"><Sparkles className="size-4" />从专属简历，到理想 Offer</span></section>
+      <section className="pipeline-guide" aria-label="阶段使用指引"><span className="pipeline-guide-icon"><ListChecks aria-hidden="true" /></span><div><h2>按阶段推进，专注当前任务</h2><p>选择下方阶段，继续完善简历、准备考核或记录复盘。</p></div><span className="pipeline-guide-note"><span aria-hidden="true" />每个阶段，都有专属工作区</span></section>
       <div className="pipeline-stage-grid">{PIPELINE_STAGES.map((item, index) => { const Icon = ICONS[index]; const count = jobs.filter(job => pipelineStageFor(job.status) === item.slug).length; return <a key={item.slug} href={`/pipeline/${item.slug}`} className={`pipeline-stage-card pipeline-tone-${item.color}`}><div className="flex items-center justify-between"><span className="pipeline-stage-icon"><Icon /></span><span className="pipeline-stage-number">0{index + 1}</span></div><p className="pipeline-eyebrow">{item.eyebrow}</p><h3>{item.title}<span>{count} 个岗位</span></h3><p>{item.description}</p><div className="pipeline-stage-link"><span>{item.action}</span><ArrowUpRight className="size-5" /></div></a>; })}</div>
     </> : <>
       <a href="/pipeline" className="pipeline-back"><ArrowLeft className="size-4" />返回求职进度</a>
