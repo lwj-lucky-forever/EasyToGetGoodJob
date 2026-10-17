@@ -237,7 +237,9 @@ function analyzeOne(requirement: string, resumeVersion: ResumeVersion, resumeCon
       requirement,
       fit,
       score,
-      evidence: `${requirementTerms.length ? (resumeTerms.length ? `所选简历已出现：${resumeTerms.join("、")}。` : "所选简历尚未直接出现相关关键词。") : ""}${[...new Set(matched.map((rule) => rule.evidence))].join("；")}`,
+      evidence: resumeTerms.length
+        ? `所选简历文字中出现：${resumeTerms.join("、")}。请核对相关经历是否足以证明这项要求。`
+        : "所选简历文字中未找到这项要求的直接关键词；请人工核对相关经历。",
       action: [...new Set(matched.map((rule) => rule.action))].join("；"),
       knowledge: [...new Set(matched.map((rule) => rule.knowledge))].join("；"),
     };
@@ -288,7 +290,7 @@ export function analyzeJob(job: JobForAnalysis, actualResumeContent?: string): M
       ? `共分析${requirements.length}条要求：${matchedCount}条匹配、${partialCount}条部分匹配、${gapCount}条需要重点补充。`
       : "岗位要求信息不足，当前分数仅供参考；补充完整要求后可获得逐条分析。",
     requirements,
-    strengths: strengths.length ? strengths : ["航空相关硕士背景、结构化研究能力和跨团队沟通经验可作为通用优势。"],
+    strengths: strengths.length ? strengths : ["暂未从当前简历文字中找到明确对应的优势，请核对提取内容并补充项目成果。"],
     priorities: priorities.length ? priorities : ["根据岗位职责补充一个可展示的针对性作品，并量化现有项目成果。"],
     basis: `基于“${resumeVersion}”的实际简历文本进行匹配；简历中未明确写出的经历不会自动视为已具备。`,
     resumeVersion,

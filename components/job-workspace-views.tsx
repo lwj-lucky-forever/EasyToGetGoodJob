@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState, type ReactNode } from "react";
-import { ArrowRight, BriefcaseBusiness, CalendarClock, CalendarDays, ExternalLink, FileText, MapPin, Save, ScrollText } from "lucide-react";
+import { ArrowRight, BriefcaseBusiness, CalendarClock, CalendarDays, ExternalLink, FileText, MapPin, Save, ScrollText, Upload } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -11,6 +11,7 @@ import { CompanyLogo } from "@/components/company-logo";
 import { JobStatusMenu } from "@/components/job-status-menu";
 import { JOB_STATUSES, PIPELINE_STATUSES, jobStatusLabel, type JobStatus } from "@/lib/job-status";
 import { RESUME_VERSIONS, type ProcessRecord, type ResumeVersion } from "@/lib/job-workflow";
+import { readResumePdf } from "@/lib/pdf-resume";
 
 export const WORKFLOW_STATUSES = JOB_STATUSES;
 export type WorkflowStatus = JobStatus;
@@ -98,14 +99,45 @@ export function ScheduleView({ jobs, onOpenDetail }: { jobs: WorkspaceJobView[];
 
 type ResumeProfile = { name: ResumeVersion; content: string; updatedAt: string };
 
-export function ResumeManagerDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (open: boolean) => void }) {
+export function ResumeManagerDialog({ open, onOpenChange, onSaved }: { open: boolean; onOpenChange: (open: boolean) => void; onSaved?: (version: ResumeVersion) => Promise<number> }) {
   const [profiles, setProfiles] = useState<ResumeProfile[]>([]);
   const [selected, setSelected] = useState<ResumeVersion>("通用版");
   const [content, setContent] = useState("");
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [reading, setReading] = useState(false);
+  const [fileName, setFileName] = useState("");
   useEffect(() => { if (!open) return; setLoading(true); void fetch("/api/resumes", { cache: "no-store" }).then(async (response) => { const data = await response.json() as { profiles?: ResumeProfile[]; error?: string }; if (!response.ok || !data.profiles) throw new Error(data.error || "简历读取失败"); setProfiles(data.profiles); const current = data.profiles.find((item) => item.name === selected) ?? data.profiles[0]; if (current) { setSelected(current.name); setContent(current.content); } }).catch((error) => toast.error(error instanceof Error ? error.message : "简历读取失败")).finally(() => setLoading(false)); }, [open]);
-  function selectVersion(value: ResumeVersion) { setSelected(value); setContent(profiles.find((item) => item.name === value)?.content ?? ""); }
-  async function save() { setSaving(true); try { const response = await fetch("/api/resumes", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: selected, content }) }); const data = await response.json() as { profile?: ResumeProfile; error?: string }; if (!response.ok || !data.profile) throw new Error(data.error || "简历保存失败"); setProfiles((current) => current.map((item) => item.name === selected ? data.profile! : item)); toast.success(`${selected}已保存，相关岗位可点击“重新分析”更新匹配度`); } catch (error) { toast.error(error instanceof Error ? error.message : "简历保存失败"); } finally { setSaving(false); } }
-  return <Dialog open={open} onOpenChange={onOpenChange}><DialogContent className="[&>[data-slot=dialog-close]]:z-20 max-h-[92vh] overflow-y-auto rounded-[1.75rem] p-0 sm:max-w-3xl"><DialogHeader className="border-b border-slate-100 px-6 py-5"><DialogTitle className="flex items-center gap-2"><ScrollText className="size-5 text-indigo-600" />简历版本管理</DialogTitle><DialogDescription>粘贴每个版本的真实简历文字，岗位匹配会优先依据该版本内容，而不是只看版本名称。</DialogDescription></DialogHeader><div className="space-y-4 px-6 py-5"><Select value={selected} onValueChange={(value) => selectVersion(value as ResumeVersion)} disabled={loading}><SelectTrigger className="w-full"><SelectValue /></SelectTrigger><SelectContent>{RESUME_VERSIONS.map((name) => <SelectItem key={name} value={name}>{name}</SelectItem>)}</SelectContent></Select><Textarea value={content} onChange={(event) => setContent(event.target.value)} disabled={loading} placeholder="粘贴该版本的完整简历文字，包括教育经历、项目经历、实习经历和技能。" className="min-h-[420px] resize-y text-base leading-7" /><p className="text-xs leading-5 text-slate-400">保存后，已存在岗位不会自动改分；在岗位匹配页点击“重新分析”即可按新简历更新。</p></div><DialogFooter className="border-t border-slate-100 px-6 py-4"><Button variant="outline" onClick={() => onOpenChange(false)}>关闭</Button><Button onClick={() => void save()} disabled={loading || saving || content.trim().length < 20} className="bg-indigo-600 hover:bg-indigo-700"><Save className="size-4" />{saving ? "保存中…" : "保存当前版本"}</Button></DialogFooter></DialogContent></Dialog>;
+  function selectVersion(value: ResumeVersion) { setSelected(value); setContent(profiles.find((item) => item.name === value)?.content ?? ""); setFileName(""); }
+  async function readFile(file?: File) {
+    if (!file) return;
+    setReading(true);
+    try { setContent(await readResumePdf(file)); setFileName(file.name); toast.success("PDF 文字已读取，请核对后保存"); }
+    catch (error) { toast.error(error instanceof Error ? error.message : "PDF 读取失败"); }
+    finally { setReading(false); }
+  }
+  async function save() {
+    setSaving(true);
+    try {
+      const response = await fetch("/api/resumes", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: selected, content }) });
+      const data = await response.json() as { profile?: ResumeProfile; error?: string };
+      if (!response.ok || !data.profile) throw new Error(data.error || "简历保存失败");
+      setProfiles((current) => current.map((item) => item.name === selected ? data.profile! : item));
+      if (onSaved) {
+        try { const count = await onSaved(selected); toast.success(`${selected}已保存，已更新 ${count} 个岗位的匹配分析`); }
+        catch { toast.warning(`${selected}已保存，但部分岗位更新失败；可在岗位匹配页点击“重新分析”`); }
+      } else toast.success(`${selected}已保存`);
+    } catch (error) { toast.error(error instanceof Error ? error.message : "简历保存失败"); }
+    finally { setSaving(false); }
+  }
+  return <Dialog open={open} onOpenChange={onOpenChange}><DialogContent className="[&>[data-slot=dialog-close]]:z-20 max-h-[92vh] overflow-y-auto rounded-[1.75rem] p-0 sm:max-w-3xl">
+    <DialogHeader className="border-b border-slate-100 px-6 py-5"><DialogTitle className="flex items-center gap-2"><ScrollText className="size-5 text-indigo-600" />上传 PDF 简历</DialogTitle><DialogDescription>选择简历版本并上传 PDF。文字只在浏览器中提取，核对后保存，用于与该版本关联的岗位匹配。</DialogDescription></DialogHeader>
+    <div className="space-y-4 px-6 py-5">
+      <Select value={selected} onValueChange={(value) => selectVersion(value as ResumeVersion)} disabled={loading || saving || reading}><SelectTrigger className="w-full"><SelectValue /></SelectTrigger><SelectContent>{RESUME_VERSIONS.map((name) => <SelectItem key={name} value={name}>{name}</SelectItem>)}</SelectContent></Select>
+      <label className="flex cursor-pointer items-center gap-3 rounded-xl border border-dashed border-indigo-200 bg-indigo-50/60 px-4 py-3 text-sm font-medium text-indigo-700 hover:bg-indigo-50"><Upload className="size-5" /><span>{reading ? "正在读取 PDF…" : fileName || "选择 PDF 简历（最大 10 MB）"}</span><input type="file" accept=".pdf,application/pdf" disabled={loading || saving || reading} className="sr-only" onChange={(event) => { void readFile(event.target.files?.[0]); event.target.value = ""; }} /></label>
+      <Textarea value={content} onChange={(event) => setContent(event.target.value)} disabled={loading || saving || reading} aria-label="提取的简历文字" placeholder="上传 PDF 后在这里核对提取内容；也可以直接粘贴简历文字。" className="min-h-[350px] resize-y text-base leading-7" />
+      <p className="text-xs leading-5 text-slate-500">保存会覆盖所选版本的原有文字，并更新使用该版本的岗位匹配度；扫描图片 PDF 需要先做文字识别。</p>
+    </div>
+    <DialogFooter className="border-t border-slate-100 px-6 py-4"><Button variant="outline" onClick={() => onOpenChange(false)} disabled={saving}>关闭</Button><Button onClick={() => void save()} disabled={loading || saving || reading || content.trim().length < 20} className="bg-indigo-600 hover:bg-indigo-700"><Save className="size-4" />{saving ? "保存并匹配中…" : "保存并匹配岗位"}</Button></DialogFooter>
+  </DialogContent></Dialog>;
 }
