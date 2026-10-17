@@ -131,7 +131,7 @@ export function ResumeManagerDialog({ open, onOpenChange, onSaved }: { open: boo
     finally { setSaving(false); }
   }
   return <Dialog open={open} onOpenChange={onOpenChange}><DialogContent className="[&>[data-slot=dialog-close]]:z-20 max-h-[92vh] overflow-y-auto rounded-[1.75rem] p-0 sm:max-w-3xl">
-    <DialogHeader className="border-b border-slate-100 px-6 py-5"><DialogTitle className="flex items-center gap-2"><ScrollText className="size-5 text-indigo-600" />上传 PDF 简历</DialogTitle><DialogDescription>选择简历版本并上传 PDF。文字只在浏览器中提取，核对后保存，用于与该版本关联的岗位匹配。</DialogDescription></DialogHeader>
+    <DialogHeader className="border-b border-slate-100 px-6 py-5"><DialogTitle className="flex items-center gap-2"><ScrollText className="size-5 text-indigo-600" />上传简历</DialogTitle><DialogDescription>选择简历版本并上传 PDF。文字只在浏览器中提取，核对后保存，用于与该版本关联的岗位匹配。</DialogDescription></DialogHeader>
     <div className="space-y-4 px-6 py-5">
       <Select value={selected} onValueChange={(value) => selectVersion(value as ResumeVersion)} disabled={loading || saving || reading}><SelectTrigger className="w-full"><SelectValue /></SelectTrigger><SelectContent>{RESUME_VERSIONS.map((name) => <SelectItem key={name} value={name}>{name}</SelectItem>)}</SelectContent></Select>
       <label className="flex cursor-pointer items-center gap-3 rounded-xl border border-dashed border-indigo-200 bg-indigo-50/60 px-4 py-3 text-sm font-medium text-indigo-700 hover:bg-indigo-50"><Upload className="size-5" /><span>{reading ? "正在读取 PDF…" : fileName || "选择 PDF 简历（最大 10 MB）"}</span><input type="file" accept=".pdf,application/pdf" disabled={loading || saving || reading} className="sr-only" onChange={(event) => { void readFile(event.target.files?.[0]); event.target.value = ""; }} /></label>
