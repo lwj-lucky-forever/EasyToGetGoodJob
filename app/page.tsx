@@ -1,4 +1,4 @@
-import { ArrowDown, ArrowRight, ArrowUpRight, BookOpenText, BriefcaseBusiness, CalendarDays, Check, Layers3, Route, ShieldCheck, Sparkles, Target, TrendingUp } from "lucide-react";
+import { ArrowDown, ArrowRight, ArrowUpRight, BookOpenText, BriefcaseBusiness, CalendarDays, Check, Layers3, Route, ShieldCheck, Sparkles, Target, TrendingUp, UserRound } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { WORKSPACE_PATHS } from "@/lib/workspace-routes";
 import "./portal.css";
@@ -23,6 +23,9 @@ export default function PortalPage() {
           <span><span className="block text-base font-bold tracking-tight sm:text-lg">EasyToGetGoodJob</span><span className="mt-0.5 hidden text-[11px] tracking-wide text-indigo-100/80 sm:block">岗位整理 · 简历适配 · 流程准备</span></span>
         </a>
         <SiteNavigation />
+        <button type="button" className="portal-account" aria-label="登录（即将开放）" title="登录（即将开放）" disabled>
+          <UserRound aria-hidden="true" size={20} strokeWidth={1.8} />
+        </button>
       </div>
     </header>
 
