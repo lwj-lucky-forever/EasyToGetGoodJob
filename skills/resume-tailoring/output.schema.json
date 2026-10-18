@@ -1,0 +1,59 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Resume tailoring output v1.0.0",
+  "type": "object", "additionalProperties": false,
+  "required": ["overall_assessment", "requirement_evidence_map", "rewrite_suggestions", "gaps", "final_notes"],
+  "properties": {
+    "overall_assessment": { "type": "string", "minLength": 1, "maxLength": 2000 },
+    "requirement_evidence_map": { "type": "array", "maxItems": 125, "items": { "$ref": "#/$defs/mapping" } },
+    "rewrite_suggestions": { "type": "array", "maxItems": 30, "items": { "$ref": "#/$defs/rewrite" } },
+    "gaps": { "type": "array", "maxItems": 125, "items": { "$ref": "#/$defs/gap" } },
+    "final_notes": { "type": "array", "maxItems": 30, "items": { "type": "string", "minLength": 1, "maxLength": 2000 } }
+  },
+  "$defs": {
+    "evidence": {
+      "type": "object", "additionalProperties": false, "required": ["resume_section", "quote"],
+      "properties": {
+        "resume_section": { "type": "string", "minLength": 1, "maxLength": 100 },
+        "quote": { "type": "string", "minLength": 1, "maxLength": 3000 }
+      }
+    },
+    "mapping": {
+      "type": "object", "additionalProperties": false,
+      "required": ["requirement_ref", "related_job_requirement", "status", "reason", "needs_confirmation", "evidence_source"],
+      "properties": {
+        "requirement_ref": { "type": "string", "minLength": 1, "maxLength": 100 },
+        "related_job_requirement": { "type": "string", "minLength": 1, "maxLength": 1000 },
+        "status": { "type": "string", "enum": ["matched", "weak_match", "gap"] },
+        "reason": { "type": "string", "minLength": 1, "maxLength": 2000 },
+        "needs_confirmation": { "type": "boolean" },
+        "evidence_source": { "type": "array", "maxItems": 5, "items": { "$ref": "#/$defs/evidence" } }
+      }
+    },
+    "rewrite": {
+      "type": "object", "additionalProperties": false,
+      "required": ["resume_section", "original_text", "suggested_text", "reason", "requirement_ref", "related_job_requirement", "evidence_source", "priority"],
+      "properties": {
+        "resume_section": { "type": "string", "minLength": 1, "maxLength": 100 },
+        "original_text": { "type": "string", "minLength": 1, "maxLength": 3000 },
+        "suggested_text": { "type": "string", "minLength": 1, "maxLength": 3000 },
+        "reason": { "type": "string", "minLength": 1, "maxLength": 2000 },
+        "requirement_ref": { "type": "string", "minLength": 1, "maxLength": 100 },
+        "related_job_requirement": { "type": "string", "minLength": 1, "maxLength": 1000 },
+        "evidence_source": { "type": "array", "minItems": 1, "maxItems": 5, "items": { "$ref": "#/$defs/evidence" } },
+        "priority": { "type": "string", "enum": ["high", "medium", "low"] }
+      }
+    },
+    "gap": {
+      "type": "object", "additionalProperties": false,
+      "required": ["requirement_ref", "type", "reason", "needs_confirmation", "evidence_source"],
+      "properties": {
+        "requirement_ref": { "type": "string", "minLength": 1, "maxLength": 100 },
+        "type": { "type": "string", "enum": ["expression_gap", "evidence_gap", "qualification_gap"] },
+        "reason": { "type": "string", "minLength": 1, "maxLength": 2000 },
+        "needs_confirmation": { "type": "boolean" },
+        "evidence_source": { "type": "array", "maxItems": 5, "items": { "$ref": "#/$defs/evidence" } }
+      }
+    }
+  }
+}

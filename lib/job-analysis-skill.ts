@@ -45,21 +45,20 @@ type SchemaNode = {
   required?: string[]; properties?: Record<string, SchemaNode>; additionalProperties?: boolean;
   items?: SchemaNode; minItems?: number; maxItems?: number; minLength?: number; maxLength?: number;
 };
-const definitions = schema.$defs as Record<string, SchemaNode>;
 
 // Supports the schema constructs used in the checked-in contract only.
 // This is not a general JSON Schema engine or a model-provider SDK.
-function checkShape(value: unknown, rule: SchemaNode, path: string, errors: string[]): void {
+function checkShape(value: unknown, rule: SchemaNode, path: string, errors: string[], definitions: Record<string, SchemaNode>): void {
   if (rule.$ref) {
     const target = rule.$ref.startsWith("#/$defs/") ? definitions[rule.$ref.slice(8)] : undefined;
     if (!target) throw new Error(`不支持的 schema 引用：${rule.$ref}`);
-    checkShape(value, target, path, errors);
+    checkShape(value, target, path, errors, definitions);
     return;
   }
-  if (rule.allOf) rule.allOf.forEach((part) => checkShape(value, part, path, errors));
+  if (rule.allOf) rule.allOf.forEach((part) => checkShape(value, part, path, errors, definitions));
   if (rule.anyOf && !rule.anyOf.some((part) => {
     const branchErrors: string[] = [];
-    checkShape(value, part, path, branchErrors);
+    checkShape(value, part, path, branchErrors, definitions);
     return branchErrors.length === 0;
   })) errors.push(`${path} 不符合允许的结构`);
   const object = value !== null && typeof value === "object" && !Array.isArray(value);
@@ -76,16 +75,24 @@ function checkShape(value: unknown, rule: SchemaNode, path: string, errors: stri
   if (Array.isArray(value)) {
     if (rule.minItems !== undefined && value.length < rule.minItems) errors.push(`${path} 缺少条目`);
     if (rule.maxItems !== undefined && value.length > rule.maxItems) errors.push(`${path} 条目过多`);
-    if (rule.items) value.forEach((item, index) => checkShape(item, rule.items!, `${path}[${index}]`, errors));
+    if (rule.items) value.forEach((item, index) => checkShape(item, rule.items!, `${path}[${index}]`, errors, definitions));
   }
   if (object) {
     const record = value as Record<string, unknown>;
     for (const key of rule.required ?? []) if (!Object.hasOwn(record, key)) errors.push(`${path}.${key} 缺失`);
     for (const key of Object.keys(record)) {
-      if (rule.properties && Object.hasOwn(rule.properties, key)) checkShape(record[key], rule.properties[key], `${path}.${key}`, errors);
+      if (rule.properties && Object.hasOwn(rule.properties, key)) checkShape(record[key], rule.properties[key], `${path}.${key}`, errors, definitions);
       else if (rule.additionalProperties === false) errors.push(`${path}.${key} 是未定义字段`);
     }
   }
+}
+
+/** Shared by independent skills using the same small JSON Schema subset. */
+export function validateSkillOutputShape(value: unknown, contract: unknown): string[] {
+  const root = contract as SchemaNode & { $defs?: Record<string, SchemaNode> };
+  const errors: string[] = [];
+  checkShape(value, root, "$", errors, root.$defs ?? {});
+  return errors;
 }
 
 export type JobAnalysisValidation = { success: true; data: JobAnalysisOutput } | { success: false; errors: string[] };
@@ -97,8 +104,7 @@ export function validateJobAnalysisOutput(output: unknown, input: JobAnalysisInp
     if (value.length > 100_000) return { success: false, errors: ["岗位解读输出过长"] };
     try { value = JSON.parse(value); } catch { return { success: false, errors: ["岗位解读输出必须是有效 JSON"] }; }
   }
-  const errors: string[] = [];
-  checkShape(value, schema as SchemaNode, "$", errors);
+  const errors = validateSkillOutputShape(value, schema);
   if (errors.length) return { success: false, errors };
   const data = value as JobAnalysisOutput;
   const claims = [
