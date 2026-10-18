@@ -1,0 +1,180 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Preparation plan output v1.0.0",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "plan_summary",
+    "tasks",
+    "risks"
+  ],
+  "properties": {
+    "plan_summary": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 2000
+    },
+    "tasks": {
+      "type": "array",
+      "maxItems": 8,
+      "items": {
+        "$ref": "#/$defs/task"
+      }
+    },
+    "risks": {
+      "type": "array",
+      "maxItems": 125,
+      "items": {
+        "$ref": "#/$defs/risk"
+      }
+    }
+  },
+  "$defs": {
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "ref"
+      ],
+      "properties": {
+        "kind": {
+          "type": "string",
+          "enum": [
+            "gap",
+            "hiring_signal",
+            "requirement"
+          ]
+        },
+        "ref": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 100
+        }
+      }
+    },
+    "task": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "title",
+        "type",
+        "description",
+        "deliverable",
+        "reason",
+        "related_requirement",
+        "priority",
+        "estimated_time_minutes",
+        "due_date",
+        "status",
+        "source",
+        "needs_confirmation"
+      ],
+      "properties": {
+        "title": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 100
+        },
+        "type": {
+          "type": "string",
+          "enum": [
+            "resume",
+            "company_research",
+            "business_research",
+            "knowledge",
+            "case_preparation",
+            "interview",
+            "mock_interview",
+            "portfolio",
+            "follow_up"
+          ]
+        },
+        "description": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 360
+        },
+        "deliverable": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200
+        },
+        "reason": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200
+        },
+        "related_requirement": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 100
+        },
+        "priority": {
+          "type": "string",
+          "enum": [
+            "high",
+            "medium",
+            "low"
+          ]
+        },
+        "estimated_time_minutes": {
+          "type": "number",
+          "minimum": 1,
+          "maximum": 480,
+          "multipleOf": 1
+        },
+        "due_date": {
+          "anyOf": [
+            {
+              "type": "null"
+            },
+            {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 10
+            }
+          ]
+        },
+        "status": {
+          "type": "string",
+          "enum": [
+            "pending"
+          ]
+        },
+        "source": {
+          "$ref": "#/$defs/source"
+        },
+        "needs_confirmation": {
+          "type": "boolean"
+        }
+      }
+    },
+    "risk": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "requirement_ref",
+        "gap_ref",
+        "description"
+      ],
+      "properties": {
+        "requirement_ref": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 100
+        },
+        "gap_ref": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 100
+        },
+        "description": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 500
+        }
+      }
+    }
+  }
+}
