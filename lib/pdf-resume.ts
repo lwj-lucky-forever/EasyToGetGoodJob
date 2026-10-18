@@ -34,8 +34,8 @@ export async function readResumePdf(file: File): Promise<string> {
       pages.push(lines.filter(Boolean).join("\n"));
     }
     const content = pages.filter(Boolean).join("\n\n").trim();
-    if (content.length < 20) throw new Error("这个 PDF 没有可读取的文字，可能是扫描图片；请使用可复制文字的 PDF，或手动粘贴简历文本");
-    if (content.length > 50_000) throw new Error("提取的文字超过 5 万字，请精简 PDF 后重试");
+    if (content.length < 20) throw new Error("暂不支持这份简历，请换用非扫描版 PDF 后重试");
+    if (content.length > 50_000) throw new Error("简历内容过长，请精简 PDF 后重试");
     return content;
   } finally {
     await documentTask.destroy();

@@ -128,8 +128,10 @@ export function ResumeManagerDialog({ open, onOpenChange, onSaved }: { open: boo
   async function readFile(file?: File) {
     if (!file) return;
     setReading(true);
-    try { setContent(await readResumePdf(file)); setFileName(file.name); toast.success("PDF 文字已读取，请核对后保存"); }
-    catch (error) { toast.error(error instanceof Error ? error.message : "PDF 读取失败"); }
+    setContent("");
+    setFileName("");
+    try { setContent(await readResumePdf(file)); setFileName(file.name); toast.success("简历已就绪，点击“保存并匹配岗位”即可应用"); }
+    catch (error) { toast.error(error instanceof Error ? error.message : "简历上传失败，请重新选择文件"); }
     finally { setReading(false); }
   }
   async function save() {
@@ -139,6 +141,7 @@ export function ResumeManagerDialog({ open, onOpenChange, onSaved }: { open: boo
       const data = await response.json() as { profile?: ResumeProfile; error?: string; updatedJobs?: number; refreshPending?: boolean };
       if (!response.ok || !data.profile) throw new Error(data.error || "简历保存失败");
       setProfiles((current) => current.map((item) => item.name === selected ? data.profile! : item));
+      setFileName("");
       let refreshed = true;
       try { if (onSaved) refreshed = await onSaved(); } catch { refreshed = false; }
       if (!refreshed || data.refreshPending) toast.warning(`${selected}已保存，部分分析仍待刷新；重新加载岗位后会自动重算`);
@@ -146,14 +149,15 @@ export function ResumeManagerDialog({ open, onOpenChange, onSaved }: { open: boo
     } catch (error) { toast.error(error instanceof Error ? error.message : "简历保存失败"); }
     finally { setSaving(false); }
   }
-  return <Dialog open={open} onOpenChange={onOpenChange}><DialogContent className="[&>[data-slot=dialog-close]]:z-20 max-h-[92vh] overflow-y-auto rounded-[1.75rem] p-0 sm:max-w-3xl">
-    <DialogHeader className="border-b border-slate-100 px-6 py-5"><DialogTitle className="flex items-center gap-2"><ScrollText className="size-5 text-indigo-600" />上传简历</DialogTitle><DialogDescription>选择简历版本并上传 PDF。文字只在浏览器中提取，核对后点击“保存并匹配岗位”，分析才会使用新内容。</DialogDescription></DialogHeader>
+  const savedProfile = profiles.find((item) => item.name === selected);
+  return <Dialog open={open} onOpenChange={onOpenChange}><DialogContent className="[&>[data-slot=dialog-close]]:z-20 max-h-[92vh] overflow-y-auto rounded-[1.75rem] p-0 sm:max-w-xl">
+    <DialogHeader className="border-b border-slate-100 px-6 py-5"><DialogTitle className="flex items-center gap-2"><ScrollText className="size-5 text-indigo-600" />上传简历</DialogTitle><DialogDescription>选择简历版本并上传 PDF，保存后自动更新岗位匹配与准备建议。</DialogDescription></DialogHeader>
     <div className="space-y-4 px-6 py-5">
       <Select value={selected} onValueChange={(value) => selectVersion(value as ResumeVersion)} disabled={loading || saving || reading}><SelectTrigger className="w-full"><SelectValue /></SelectTrigger><SelectContent>{RESUME_VERSIONS.map((name) => <SelectItem key={name} value={name}>{name}</SelectItem>)}</SelectContent></Select>
-      <label className="flex cursor-pointer items-center gap-3 rounded-xl border border-dashed border-indigo-200 bg-indigo-50/60 px-4 py-3 text-sm font-medium text-indigo-700 hover:bg-indigo-50"><Upload className="size-5" /><span>{reading ? "正在读取 PDF…" : fileName || "选择 PDF 简历（最大 10 MB）"}</span><input type="file" accept=".pdf,application/pdf" disabled={loading || saving || reading} className="sr-only" onChange={(event) => { void readFile(event.target.files?.[0]); event.target.value = ""; }} /></label>
-      <Textarea value={content} onChange={(event) => setContent(event.target.value)} disabled={loading || saving || reading} aria-label="提取的简历文字" placeholder="上传 PDF 后在这里核对提取内容；也可以直接粘贴简历文字。" className="min-h-[350px] resize-y text-base leading-7" />
+      <label className="flex cursor-pointer items-center gap-3 rounded-xl border border-dashed border-indigo-200 bg-indigo-50/60 px-4 py-5 text-sm font-medium text-indigo-700 hover:bg-indigo-50"><Upload className="size-5 shrink-0" /><span className="min-w-0 break-all">{reading ? "正在准备简历…" : fileName || "选择 PDF 简历（最大 10 MB）"}</span><input type="file" accept=".pdf,application/pdf" disabled={loading || saving || reading} className="sr-only" onChange={(event) => { void readFile(event.target.files?.[0]); event.target.value = ""; }} /></label>
+      <p role="status" className="text-sm text-slate-500">{loading ? "正在加载简历…" : reading ? "请稍候，完成后即可保存。" : fileName ? "简历已就绪，可保存并匹配岗位。" : content.trim() ? `此版本已有简历，可重新上传替换。${savedProfile?.updatedAt ? `上次保存：${new Date(savedProfile.updatedAt).toLocaleString("zh-CN")}` : ""}` : "此版本尚未上传简历。"}</p>
       <label className="flex items-start gap-2 rounded-xl border border-indigo-100 bg-indigo-50/60 p-3 text-sm text-slate-700"><input type="checkbox" className="mt-1 accent-indigo-600" checked={applyToAllJobs} disabled={loading || saving || reading} onChange={(event) => setApplyToAllJobs(event.target.checked)} /><span>将这份简历用于全部现有岗位<span className="mt-1 block text-xs leading-5 text-slate-500">统一切换岗位的简历版本并重新匹配，不会删除其他已保存版本。取消勾选则保留各岗位的版本选择。</span></span></label>
-      <p className="text-xs leading-5 text-slate-500">保存会覆盖所选版本文字。岗位选择的版本未保存时，依次使用已保存的通用版、最近保存的版本；没有简历则提示上传。扫描图片 PDF 需先做文字识别。</p>
+      <p className="text-xs leading-5 text-slate-500">保存会替换所选版本的简历，其他版本不受影响。</p>
     </div>
     <DialogFooter className="border-t border-slate-100 px-6 py-4"><Button variant="outline" onClick={() => onOpenChange(false)} disabled={saving}>关闭</Button><Button onClick={() => void save()} disabled={loading || saving || reading || content.trim().length < 20} className="bg-indigo-600 hover:bg-indigo-700"><Save className="size-4" />{saving ? "保存并匹配中…" : "保存并匹配岗位"}</Button></DialogFooter>
   </DialogContent></Dialog>;

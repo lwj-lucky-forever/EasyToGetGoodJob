@@ -1,19 +1,19 @@
 "use client";
 
-import { ArrowDown, ArrowUp, ClipboardCheck, ExternalLink, FileText, MoreHorizontal, NotebookPen, Pencil, Trash2 } from "lucide-react";
+import { ArrowDown, ArrowUp, ClipboardCheck, ExternalLink, FileText, MoreHorizontal, CalendarPlus, Pencil, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 
-export function JobCardActions({ role, sourceUrl, onDetail, onPrepare, onProcess, onEdit, onDelete, onMoveUp, onMoveDown, canMoveUp, canMoveDown, preparationLabel, processLabel, preparationCount, processCount }: {
+export function JobCardActions({ role, sourceUrl, onDetail, onPrepare, onProcess, onEdit, onDelete, onMoveUp, onMoveDown, canMoveUp, canMoveDown, preparationLabel, processLabel, preparationCount }: {
   role: string; sourceUrl: string; onDetail: () => void; onPrepare: () => void; onProcess: () => void; onEdit: () => void; onDelete: () => void;
   onMoveUp: () => void; onMoveDown: () => void; canMoveUp: boolean; canMoveDown: boolean; preparationLabel: string; processLabel: string;
-  preparationCount?: string; processCount?: number;
+  preparationCount?: string;
 }) {
   return <div className="flex h-13 shrink-0 items-center justify-between gap-1 border-t border-slate-100/80 bg-gradient-to-b from-white to-slate-50/80 px-2.5">
     <div className="flex min-w-0 items-center gap-0.5">
       <Button variant="ghost" size="xs" onClick={onDetail} className="h-7 gap-1 rounded-md px-1.5 font-normal text-slate-500 hover:bg-indigo-50/70 hover:text-indigo-600"><FileText className="size-3.5" />详情</Button>
       <Button variant="ghost" size="xs" onClick={onPrepare} title={preparationLabel} className="h-7 gap-1 rounded-md px-1.5 font-normal text-slate-500 hover:bg-indigo-50/70 hover:text-indigo-600"><ClipboardCheck className="size-3.5" /><span>准备{preparationCount !== undefined && <span className="ml-1 tabular-nums text-slate-400">{preparationCount}</span>}</span></Button>
-      <Button variant="ghost" size="xs" onClick={onProcess} title={processLabel} className="h-7 gap-1 rounded-md px-1.5 font-normal text-slate-500 hover:bg-indigo-50/70 hover:text-indigo-600"><NotebookPen className="size-3.5" /><span>流程{processCount !== undefined && <span className="ml-1 tabular-nums text-slate-400">{processCount}</span>}</span></Button>
+      <Button variant="ghost" size="xs" onClick={onProcess} title={processLabel} className="h-7 gap-1 rounded-md px-1.5 font-normal text-slate-500 hover:bg-indigo-50/70 hover:text-indigo-600"><CalendarPlus className="size-3.5" /><span>新建日程</span></Button>
     </div>
     <div className="ml-auto flex shrink-0 items-center gap-0.5 border-l border-slate-100 pl-2">
       <Button variant="ghost" size="icon-sm" onClick={onEdit} title="编辑岗位" aria-label={`编辑${role}`} className="size-7 rounded-md text-slate-400 hover:bg-indigo-50/70 hover:text-indigo-600"><Pencil className="size-3.5" /></Button>

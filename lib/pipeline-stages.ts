@@ -2,7 +2,7 @@ import type { JobStatus } from "./job-status";
 import type { ProcessRecord } from "./job-workflow";
 
 export const PIPELINE_STAGES = [
-  { slug: "apply", title: "待投递", status: "未投递", eyebrow: "MAKE IT PERSONAL", description: "对照岗位要求，打磨专属简历。", action: "根据岗位修改简历", color: "indigo" },
+  { slug: "apply", title: "待投递", status: "未投递", eyebrow: "MAKE IT PERSONAL", description: "对照岗位要求，打磨专属简历。", action: "简历修改建议", color: "indigo" },
   { slug: "prepare", title: "准备中", status: "准备中", eyebrow: "BUILD YOUR CONFIDENCE", description: "把匹配差距变成可以完成的小目标。", action: "推进准备清单", color: "violet" },
   { slug: "assessment", title: "笔试", status: "笔试", eyebrow: "CAPTURE THE CHALLENGE", description: "记录考察内容，沉淀解题思路。", action: "记录笔试考察", color: "sky" },
   { slug: "interview", title: "面试", status: "面试", eyebrow: "TELL YOUR STORY", description: "保存真实问题，复盘每一次回答。", action: "记录真实面试", color: "pink" },
