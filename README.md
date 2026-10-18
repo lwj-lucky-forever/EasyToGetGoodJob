@@ -1,128 +1,389 @@
-# vinext-starter
+﻿# EasyToGetGoodJob
 
-> 当前 EasyToGetGoodJob Windows 工作区请使用 `npm.cmd run local:preview` 启动，首次登录 <http://127.0.0.1:5173/signin-with-chatgpt?return_to=/>。修改源码后先停止服务，执行 `npm.cmd run build`，再启动预览。`npm run dev` 的 Cloudflare 开发模块 WebSocket 通道已复现 `ECONNRESET`；详见 [本地运行说明](README-本地运行.md) 和 [连接诊断](docs/Windows开发启动ECONNRESET诊断.md)。请保留 `.wrangler/state` 中的本地岗位数据。
+**把求职中的每一步整理好，让找好工作变得更容易。**
 
-A clean full-stack starter running on [vinext](https://github.com/cloudflare/vinext), with optional Cloudflare D1 and Drizzle support.
+一个从个人实习求职经历出发的求职管理工具，将 **岗位收集 → 判断优先级 → 投递准备 → 流程推进 → 面试复盘** 放进同一个工作区。
 
-## Prerequisites
+我负责问题定义、需求拆解、交互设计和验收，通过 Codex 辅助实现与持续迭代。这份作品重点展示：如何从真实问题出发做产品取舍，以及如何为 AI 建立可追溯、可验证的工作边界。
 
-- Node.js `>=22.13.0`
-- Portable: Windows, macOS, or Linux; no Bash required
-- Managed Linux: managed Linux runtime with Bash, `flock`, `curl`, `sha256sum`, and GNU `timeout`
-- Git is required only for publishing
+> **当前状态｜个人作品集 / 本地可运行项目**
+>
+> 四大业务模块已实现；岗位解析、简历文字匹配和准备清单使用规则逻辑。三个 AI Skill 已有定义、结构化接口、校验和测试，**尚未接入真实 LLM，也未接入页面的分析执行流程**。公开多用户版本仍在规划中。
 
-## Sites Lifecycle
+## 先用 2–3 分钟了解这个项目
 
-The Sites initializer copies the shared starter and selects managed-linux only when `SITES_MANAGED_LINUX_CONTAINER=1`; otherwise it selects portable. It saves the selection only in ignored `.sites-runtime/execution-profile.json`. Both profiles copy/configure first, then use the plugin's separate `install-dependencies.mjs` step to measure installation independently. Edit source under `app/` and follow the Sites skill for installation, preview, builds, and publishing.
+| 想解决的问题 | 产品中的回答 |
+| --- | --- |
+| 岗位散落在不同渠道，记录之后仍然很乱 | 文本 / URL 导入，统一成可编辑的岗位卡片，按公司聚合 |
+| 收藏了很多岗位，不知道先准备哪个 | 简历文字匹配参考、手动优先级、默认排序与自定义顺序 |
+| 投递之后，只记得状态，不知道下一步 | 六阶段工作区，把每个阶段需要做的事直接放在岗位旁边 |
+| 希望 AI 帮忙，但不希望它编造我的经历 | 将岗位解读、证据映射、准备计划拆成三个可校验的 Skill |
 
-Run `node <plugin-root>/scripts/configure-execution-profile.mjs` only when the profile is unknown for the current checkout and environment. Profile changes do not alter tracked source or require reinstalling otherwise-valid dependencies; restart an existing preview to use the new selection. Do not commit or upload `.sites-runtime/`.
+**建议演示路线：** 首页 → 导入一条具体岗位链接 → 检查并保存表单 → 上传简历查看匹配依据 → 进入求职阶段工作区 → 完成一项准备任务或日程 → 记录面试复盘。
 
-This starter does not use `wrangler.jsonc`.
+这条路线目前可以展示规则驱动的业务闭环；Skill 设计请结合规范、接口和测试展示，不能把页面中的规则建议当作模型输出。
 
-`install:ci` runs `npm ci` once against the shared lockfile, disables parent-workspace discovery, and includes required dev/optional dependencies despite production/omit settings. Sharp defaults to prebuilt binaries unless explicitly configured otherwise. Do not overlap installers.
+## 01 · 产品起点：收集岗位之后，求职管理才刚开始
 
-- **Portable:** Preserve host HOME, npm cache, registry, proxy, temporary paths, retry/concurrency settings, and lifecycle-script policy. Use `--prefer-offline --no-audit --no-fund`.
-- **Managed Linux:** Use the existing project-local HOME/cache/tmp setup and Linux install lock, tarball preflight, and timeout. Restore the image-seeded npm cache only when its lockfile hash matches; retain network fallback. Builds keep their existing timeout. These helpers are not invoked by the portable profile.
+找实习时，我发现岗位来源非常分散：企业官网、招聘平台、内推链接、微信消息，每个渠道都有自己的信息格式。
 
-`scripts/sites-env.mjs` preserves the caller's HOME, npm cache, proxy, XDG, and temporary-directory configuration while defaulting Wrangler and Miniflare state to the checkout. If npm reports an unwritable cache, select a writable path with `npm_config_cache` for that install. The `dev` and `start` scripts also keep Wrangler logs inside the checkout. Generated `.sites-runtime/` and `.wrangler/` directories are disposable and ignored by Git.
+我需要反复复制 JD，记录公司、岗位、截止日期、投递状态和面试安排。岗位少时，备忘录还能应付；岗位多了之后，真正困难的变成了：哪些值得先投？这个岗位要用哪一版简历？投递之后，我还应该做什么？
 
-On portable, `npm run dev` uses `vinext dev` with HMR, starting at port 5173. Vinext records the running server in ignored `.vinext/` state, rejects an ordinary duplicate launch, and recovers stale state after a stopped process; exactly simultaneous starts can race. Pass `--port <port>` or `--hostname <host>` after `npm run dev --` when needed; keep portable previews on loopback.
+因此，我想解决的不只是“保存一条招聘信息”，而是**减少从看到机会到采取下一步行动之间的断层**。岗位是整个产品的组织中心：简历、准备任务、日程和复盘都围绕具体岗位展开，而不是散落在几个互不关联的工具里。
 
-For browser QA on managed Linux, use `sites-preview start`. The project's dev script runs Vite and accepts the supervisor's `--host 0.0.0.0 --port 4173 --strictPort` arguments. The internal browser uses `http://terminal.local:4173/`; it is not a user-facing URL. The supervisor owns the preview lifecycle. The ignored local profile survives the supervisor's cleared process environment.
+第一阶段聚焦需要同时跟进多个机会的实习 / 校招求职者，以自己的使用过程发现问题、验证交互。目前没有规模化用户研究或商业化数据，个人体验也不能替代后续用户验证。
 
-The portable profile simulates ChatGPT sign-in only for loopback development requests. Visit `/signin-with-chatgpt?return_to=/` to sign in as `local_seedy` (`seedy@sites.test`, display name `Seedy`) and `/signout-with-chatgpt?return_to=/` to sign out. The development cookie preserves that identity across server restarts. Mock auth is disabled in the managed-linux profile and is not included in production builds; hosted authentication remains dispatch-owned.
+## 02 · 从痛点到解法
 
-The Worker uses `vinext/server/fetch-handler`, including Vinext's config-aware image handling. After building, `npm start` runs that Worker locally through Wrangler on `127.0.0.1`, sharing `.wrangler/state` with dev preview and local D1 migrations; it does not deploy the site or simulate sign-in. Use the URL printed by the server. Pass `npm start -- --port <port>` to select a different built-preview port.
+| 核心痛点 | 产品解法 | 设计判断 |
+| --- | --- | --- |
+| 岗位来源分散、格式不一 | 手动新增、粘贴 JD、招聘 URL 导入，共用岗位模型 | 降低收集成本，同时保留原链接和人工修正入口 |
+| 复制网页容易带入菜单、宣传和其他职位 | 结构化数据优先，只读取目标岗位对象或正文区域 | “抓到内容”不等于“导入正确岗位” |
+| 机会多，优先级难判断 | 单岗位匹配参考 + 高中低优先级 + 默认 / 自定义排序 | 系统提供初始参考，最终选择权留给用户 |
+| 投递后不知道推进什么 | 阶段专属工作区、卡片“下一项”、日程完成勾选 | 状态需要连接行动，不能只是换一种颜色 |
+| 不同岗位需要不同准备 | 关联简历版本、逐条要求分析、岗位专属草稿、准备清单和复盘 | 让准备围绕具体要求，而不是一份通用建议 |
+| AI 建议可能缺乏依据甚至夸大经历 | 三个 Skill 的证据引用、缺口分类、结构校验和人工确认设计 | 先建立可信边界，再接入模型；该链路尚未在 UI 执行 |
 
-Local previews use Miniflare's placeholder `Request.cf` metadata without a network lookup. Set `CLOUDFLARE_CF_FETCH_ENABLED=true` to opt into fetching preview metadata; this setting does not change hosted request metadata.
+## 03 · 当前产品：四个模块，一条求职主线
 
-Local tool usage metrics are disabled by default. Set `WRANGLER_SEND_METRICS=true` to opt in.
+| 模块 / 路由 | 回答的问题 | 已实现的主要能力 |
+| --- | --- | --- |
+| 首页 `/` | 这个工具能帮我做什么？ | 品牌主视觉、动态插图、四大模块入口、统一导航 |
+| 岗位管理 `/jobs` | 我有哪些机会，先准备哪个？ | 收集、导入、公司分组、搜索筛选、匹配与排序、岗位详情 |
+| 求职进度 `/pipeline` | 当前阶段该推进什么？ | 六阶段入口与独立工作区，记录简历准备、考核、Offer 和未通过原因 |
+| 日程安排 `/schedule` | 接下来什么时候做什么？ | 汇总投递截止、提醒及笔试 / 面试安排，勾选完成与撤销 |
+| 面试题库 `/interviews` | 怎样练习并积累经验？ | 题目筛选、追问和回答框架、练习记录、自评与复盘 |
 
-## Included Shape
+<details>
+<summary><strong>展开完整功能清单与当前边界</strong></summary>
 
-- edit site code under `app/`
-- `app/chatgpt-auth.ts` provides optional dispatch-owned ChatGPT sign-in helpers
-- `.openai/hosting.json` declares optional Sites D1 and R2 bindings
-- `vite.config.ts` simulates declared bindings for local development
-- `db/index.ts` reads the D1 binding from the Cloudflare Worker environment
-- `db/schema.ts` starts intentionally empty
-- `@cloudflare/workers-types` provides Worker types; `cloudflare-env.d.ts` declares optional `DB`/`BUCKET` bindings—update these declarations if binding names change
-- `examples/d1/` contains an optional D1 example surface
-- `drizzle.config.ts` supports local migration generation when needed
+### 岗位管理与导入
 
-## Workspace Auth Headers
+- 手动新增、编辑、删除岗位；查看职责、任职要求、重点考察能力、地点、性质和原链接。
+- 粘贴 JD 文本或输入具体招聘详情 URL，识别公司、岗位名称、地点、性质、职责、要求、能力及明确的截止日期。
+- 识别结果**直接填入下方表单**，用户可修改后保存；不再增加独立“识别结果预览”步骤。
+- 公司词典、招聘站点身份与结构化雇主信息共同参与识别；常见公司显示对应 Logo。
+- 重点考察能力优先保留明确原文，缺失时从职责与要求中的规则证据提取，不仅凭岗位名称补标签。
+- 网页中可识别的学历、专业、经验、实习时长、出勤、薪资、发布时间等作为岗位补充信息处理；没有独立数据库列的内容保留在整理后的 `rawText` / 要求中，不代表这些信息都有独立编辑框或筛选器。
+- 支持关键词搜索、状态筛选；关键词可检索公司、岗位、地点、性质和 JD 内容。没有独立的城市 / 公司多维筛选面板。
+- 按公司聚合卡片；显示单岗位匹配度、优先级、核心信息及下一项安排；无安排时保留占位区域。
+- 默认在公司分组内按匹配度降序，公司组按最高岗位分数排序；支持公司及岗位上移 / 下移保存顺序，以及优先级、截止日期、匹配度、更新时间排序选项。
+- 底部保留详情、准备、新建日程、编辑；更多菜单收纳上移、下移、原链接、删除。
+- 岗位管理统计为全部岗位、待投递、进行中；不展示全局平均匹配度。截止 / 提醒提示仍保留。
 
-Signed-in visitors receive both `oai-authenticated-user-id` and `oai-authenticated-user-email`. Private Sites require every visitor to sign in; public Sites may also have anonymous visitors, for whom neither header is present.
+### 求职进度：六个阶段，而不是重复一份岗位列表
 
-The user ID is stable for the same user on the same Site and different across Sites. Use it as the durable user key; use email and name for display or contact purposes.
+| 阶段 | 路由 | 工作区内容 |
+| --- | --- | --- |
+| 待投递 | `/pipeline/apply` | 简历修改建议、读取所选简历作为起点、编辑和保存本岗位专属文字草稿 |
+| 准备中 | `/pipeline/prepare` | 岗位准备清单、完成数量及进度、查看分析 |
+| 笔试 | `/pipeline/assessment` | 记录考察内容、答题表现与复习方向 |
+| 面试 | `/pipeline/interview` | 按岗位记录真实面试题、回答、轮次、日期、自评、复盘和下一步 |
+| Offer | `/pipeline/offer` | 记录工作地点、薪资福利、工作时间、每周到岗天数及预计到岗日期 |
+| 未通过 | `/pipeline/closed` | 记录明确反馈、未通过原因及下一步行动 |
 
-SIWC-authenticated workspace sites may also receive `oai-authenticated-user-full-name` when the user's SIWC profile has a non-empty `name` claim. The full-name value is percent-encoded UTF-8 and is accompanied by `oai-authenticated-user-full-name-encoding: percent-encoded-utf-8`.
+支持手动推进阶段、保存后继续编辑、未保存内容离开提醒。阶段详情通过“返回求职进度”回到总入口。旧数据中的“已投递”归入准备阶段展示，底层状态仍兼容保留；“未投递 / 暂停”在界面显示为“待投递 / 未通过”，没有为改文案破坏历史数据。
 
-Treat the full name as optional and fall back to email when it is absent:
+岗位专属简历草稿**不会覆盖已上传简历，也不会自动改变匹配分数**。当前没有自动投递功能。
 
-```tsx
-import { headers } from "next/headers";
+### 简历、匹配与准备
 
-export default async function Home() {
-  const requestHeaders = await headers();
-  const userId = requestHeaders.get("oai-authenticated-user-id");
-  const email = requestHeaders.get("oai-authenticated-user-email");
-  const encodedFullName = requestHeaders.get("oai-authenticated-user-full-name");
-  const fullName =
-    encodedFullName &&
-    requestHeaders.get("oai-authenticated-user-full-name-encoding") ===
-      "percent-encoded-utf-8"
-      ? decodeURIComponent(encodedFullName)
-      : null;
+- 上传 PDF 简历，浏览器内部读取文本，保存后更新岗位匹配；界面不单独暴露识别文字步骤。
+- 提供通用、产品、运营、数据分析、航空专业五个简历版本；可选择将当前版本应用到全部已有岗位。
+- 服务端保存的是简历文本，不是 PDF 原文件；目前不支持扫描件 OCR。限制为 10 MB、30 页、50,000 字符。
+- 逐条展示要求的匹配 / 部分匹配 / 需补充 / 待确认、简历文字证据、行动及知识建议。
+- 规则生成“行动 / 知识”准备清单，可勾选完成；重新分析时保留仍适用且文字一致的完成状态。
+- 更新简历或相关 JD 字段后，通过输入指纹检查并重算，避免继续引用旧简历缓存。
 
-  const displayName = fullName ?? email;
-  // ...
-}
+### 日程、题库与数据管理
+
+- 为岗位创建笔试、一面、二面、终面、HR 沟通等日程，记录时间、备注、结果和进行状态。
+- 日程页按时间汇总未完成事项，展示已完成区域；完成勾选可撤销并持久化，不自动改变岗位阶段。
+- 当前提醒是站内展示，没有邮件 / 短信 / 系统推送，也没有外部日历同步。
+- 内置美团、百度相关面试练习题，保留来源链接，提供方向、年份、公司、练习状态筛选和关键词搜索；题目是整理内容，不保证是最新或完整题库。
+- 支持练习与复盘的新增、编辑、删除，记录回答、0–5 自评、复盘和下一步，并可关联岗位。真实面试复盘主入口位于面试阶段；没有 AI 自动批改或语音模拟面试。
+- 更多菜单中的“资料导入与导出”提供 JSON 完整备份、合并 / 替换恢复，及岗位 / 复盘 CSV 导出。替换恢复需要确认。
+- 已有 Web Manifest、Service Worker、安装元数据及离线提示页；这是 Web / PWA 基础能力，不是原生 App，也不支持离线编辑业务数据和自动同步。
+- API 按所有者身份限制访问。首页登录头像只是展示入口，独立邮箱注册登录和开放多用户体系尚未实现。
+
+</details>
+
+## 04 · 重要迭代：我如何做产品取舍
+
+### 1. URL 导入：从“网页抓取成功”转向“岗位识别正确”
+
+早期问题并不只是网络连接：动态页面可能只有外壳，而整页文字又会混入导航、推荐职位和公司介绍。把它们全交给后续分析，会让错误沿着链路传递。
+
+现在采用以下流程：
+
+```text
+具体岗位 URL
+  → 保留岗位参数，清理明确的追踪参数，检查跳转
+  → 识别最终站点 / 招聘平台
+  → JSON-LD JobPosting
+  → 站点内嵌数据 / 通用内嵌 JSON
+  → 已适配的公开岗位详情接口
+  → 岗位 DOM 区域 / 标题分节兜底
+  → 目标岗位核对、去噪、职责与要求分离、字段标准化
+  → 填入可编辑表单 → 用户保存 → 共用岗位保存和匹配流程
 ```
 
-## Optional Dispatch-Owned ChatGPT Sign-In
+上面各解析层按优先级尝试，取得有效岗位后结束，不是每次都执行全部步骤。无法确认具体岗位时明确失败，允许改用粘贴 JD；不把整个 `body` 当作最终兜底结果。
 
-Import the ready-to-use helpers from `app/chatgpt-auth.ts` when the site needs optional or required ChatGPT sign-in:
+已有适配器覆盖**百度、字节 / 小米共用的飞书招聘协议、美团、Moka、小红书、阿里**的特定详情链接。腾讯、京东、滴滴、华为等有站点识别或通用解析入口，**不能据此宣称所有招聘页面都已适配**。登录限制、验证码、岗位下线和官网协议变化仍可能导致失败；目前没有引入 Headless Browser。
 
-- Use `getChatGPTUser()` for optional signed-in UI.
-- Use the returned `userId` as the stable user key for user-owned records; do not use email as a durable identifier.
-- Use `requireChatGPTUser(returnTo)` for server-rendered pages that should send anonymous visitors through Sign in with ChatGPT.
-- In a Server Component, start sign-in with `<a href={chatGPTSignInPath(returnTo)} target="_top">`. The auth helper module is server-only; do not import it into a Client Component.
-- Do not use `fetch`, XHR, a client-side router, or a framework link that can prefetch the sign-in route. SIWC must start as a top-level navigation.
-- Never request the AuthAPI authorization endpoint directly. The dispatch-owned `/signin-with-chatgpt` route must start the SIWC flow.
-- Use `chatGPTSignOutPath(returnTo)` for browser sign-out links or actions.
-- Pass a same-origin relative `returnTo` path for the destination after sign-in or sign-out. The helper validates and safely encodes it.
-- Mark protected pages with `export const dynamic = "force-dynamic"` because they depend on per-request identity headers.
+产品上的取舍是：宁可保留缺失字段并提醒核对，也不导入错误岗位；技术上的取舍是通用解析器配合小型适配器，新增网站不必改整条业务流程。详见 [URL 导入架构与扩展指南](docs/URL岗位导入架构与扩展指南.md)。该文保留历史验证记录，其中旧“预览”交互以当前直接填表流程为准。
 
-Dispatch owns `/signin-with-chatgpt`, `/signout-with-chatgpt`, `/callback`, the OAuth cookies, and identity header injection. Do not implement app routes for those reserved paths. Routes that do not import and call the helper remain anonymous-compatible.
+### 2. 岗位管理与求职进度：从信息重复转向任务分工
 
-SIWC establishes identity only; it does not prove workspace membership. Use the Sites hosting platform's access policy controls for workspace-wide restrictions, or enforce explicit server-side membership or allowlist checks.
+早期两个页面都围绕卡片和状态展开，切换页面并没有带来新的价值。后来将它们重新定义为：
 
-Use SIWC for account pages, user-specific dashboards, saved records, and write actions tied to the current ChatGPT user. Leave public content anonymous.
+- **岗位管理：我有哪些机会，选什么。** 保留收集、筛选、比较和排序。
+- **求职进度：现在该推进什么，怎么推进。** 去掉重复统计与搜索，按阶段提供简历、准备、笔试、面试、Offer 和复盘工作区。
 
-## Local D1 migrations
+没有继续增加一套重复看板，而是让“阶段”对应真实动作。相关实现可从 `201492d`、`6eb7e77`、`bb7ad14` 的 Git 提交查看。
 
-For a D1-backed local preview, generate SQL with `npm run db:generate`. Build once through the Sites skill's build entrypoint (or `npm run build` for standalone use) to generate `dist/server/wrangler.json`, rebuilding if bindings change. From the project root, apply each pending migration in order:
+### 3. 排序：系统建议不能覆盖人的判断
 
-```sh
-node --import ./scripts/sites-env.mjs ./node_modules/wrangler/bin/wrangler.js d1 execute DB --local --config dist/server/wrangler.json --persist-to .wrangler/state --file drizzle/0000_example.sql
+默认排序帮助用户快速找到值得关注的机会；但用户上移 / 下移可能是在表达分数无法反映的偏好，例如通勤、业务兴趣或时间窗口。
+
+因此，未手动调整时按匹配度排序；一旦调整，则优先保留自定义顺序。新增岗位在默认模式下按分数进入相应位置，在自定义模式下追加而不打乱已有顺序。实现复用 `companyOrder / jobOrder`，并记录本地手动排序标记；搜索筛选不改写保存顺序。
+
+### 4. 简历更新：分析必须跟着真实输入变化
+
+曾出现上传新简历后仍引用旧简历分析的问题。修复不只更换展示文案，而是统一实际简历来源，并将 JD、简历内容、所选版本和算法版本纳入缓存指纹。
+
+这里的产品判断是：**用户需要知道“分析基于哪份材料”，而不只是得到一个分数。** 修复和回归测试见提交 `22d908b`。
+
+## 05 · 当前“智能分析”究竟怎样工作
+
+当前执行链路是确定性的规则流程：
+
+```text
+保存岗位 / 更新简历 / 重新分析
+  → 读取实际已保存简历，检查缓存指纹
+  → 拆分岗位要求，核对关键词、学历和部分时间条件
+  → 计算每条要求的文字覆盖参考，汇总为匹配分数
+  → 展示依据与待确认项，生成规则建议及准备清单
 ```
 
-Replace the filename with the pending migration and `DB` with your D1 binding name if different. Use `.wrangler/state`, not `.wrangler/state/v3`; Wrangler adds the versioned directories. Do not replay migrations already applied locally. This updates only the preview database; publishing applies production migrations separately.
+匹配分数来自各条要求得分的平均值，**不是录用概率，也不是模型对候选人能力的判断**。复杂语义、组合条件和熟练程度仍需人工核对；没有简历或要求不足时，0 分表示未评估，不能理解为不适合。
 
-## Diagnostic Commands
+分析优先使用岗位选定的已保存简历，没有时回退到通用版或最近保存的真实版本，并说明实际来源；没有可用简历时不填入示例人物资料。核心代码位于 [resume-matcher.ts](lib/resume-matcher.ts) 和 [resume-profile-server.ts](lib/resume-profile-server.ts)。
 
-- `npm run install:ci`: perform the one locked dependency install
-- `npm run dev`: start the Vite/Vinext development server
-- `npm run build`: build the deployable Sites artifact
-- `npm run start`: preview the built Worker locally with D1/R2 support
-- `npm run db:generate`: generate Drizzle migrations after schema changes
+## 06 · AI 产品设计：先建立 Workflow，再考虑 Agent
 
-When using the Sites plugin, follow its skill instructions for installation, builds, and publishing. These npm commands remain available for standalone use.
+### 为什么拆成三个 Skill
 
-The portable build runs Vinext directly without a host `timeout` command. The managed-linux build uses `scripts/build-verified.sh` and its existing `SITES_BUILD_TIMEOUT` setting.
+一个大 Prompt 同时承担“理解 JD、判断我是否符合、改简历、排计划”，很难定位哪一步产生错误，也容易让后面的建议依赖模型刚刚编造的结论。
 
-## Learn More
+我将三个任务分开，让它们具有稳定输入、输出和职责边界：
 
-- [vinext Documentation](https://github.com/cloudflare/vinext)
-- [Drizzle D1 Guide](https://orm.drizzle.team/docs/get-started/d1-new)
+| Skill | 输入与职责 | 结构化输出 | 当前状态 |
+| --- | --- | --- | --- |
+| [岗位解读](skills/job-analysis/SKILL.md) | 复用岗位字段，只解读 JD，不评价候选人 | `summary`、职责、`must_have`、`nice_to_have`、隐含要求、技能、门槛、招聘信号、不确定项 | 定义、JSON Schema、输入适配、引用校验和测试已实现 |
+| [简历定制](skills/resume-tailoring/SKILL.md) | 读取已校验的岗位解读和当前简历，不重复分析完整 JD | `overall_assessment`、要求—证据映射、逐条改写、三类缺口、说明 | 定义、接口、证据与措辞校验、输入指纹和测试已实现 |
+| [准备计划](skills/preparation-plan/SKILL.md) | 读取前两步结果、已有清单和用户时间约束，不重新做匹配 | `plan_summary`、任务、资格风险；任务包含来源、优先级、估时、交付物和日期 | 定义、接口、去重 / 时间校验、现有清单转换和测试已实现 |
+
+这里的 Skill 是项目内的业务规范与接口契约。放置 `SKILL.md` **不会自动执行模型，也不会自动安装为 Codex 全局技能**。
+
+计划接入的流程如下；目前尚无执行这一链路的 LLM 服务或 UI 编排：
+
+```text
+岗位字段 → job-analysis → 校验后的岗位要求
+                          ↓ + 当前真实简历
+                    resume-tailoring → 证据映射与缺口
+                                         ↓ + 已有任务 / 时间约束
+                                   preparation-plan
+                                         ↓ 校验 / 用户采纳
+                                    现有准备清单
+```
+
+拆分后可以复用上游结果、保留证据引用、按步骤评估错误，并在简历更新后识别失效结果。当前三个 Skill 的完整输出没有自动持久化，也没有替换 `jobs.analysisJson` 中原有的规则分析格式。
+
+### 为什么第一阶段不直接做 Agent
+
+目前任务顺序明确，简历和岗位又涉及个人信息与事实准确性。可控的 Workflow 更适合先解决输入版本、输出校验、失败提示和用户确认，而不是让系统自行选择工具、循环搜索或执行外部操作。
+
+后续只有在任务质量和数据边界稳定后，再考虑求职准备 Agent。仓库已有可选浏览器工具注册接口，但这不等于已经运行一个自主 Agent。
+
+## 07 · 可靠性设计：建议可以优化表达，不能创造经历
+
+**已实现的是 Skill 规范与程序校验，不是“模型绝不幻觉”的承诺。**
+
+| 风险 | 当前已落地的约束 | 仍需补充的验证 |
+| --- | --- | --- |
+| 把加分项当硬门槛，或猜测未写条件 | 岗位解读区分必要 / 加分 / 推断，明确 `explicit / inferred`，缺失门槛为 `null`，保留 `uncertainties` 和原文引用 | 否定、复合条件及冲突的语义判断评估 |
+| 没有证据却判断匹配 | 定制结果区分 `matched / weak_match / gap`；正向映射需要当前简历证据，无证据的 gap 不允许生成改写 | 引文存在不等于引文足以支持结论，仍需语义审查 |
+| 编造项目、公司、技能或数字 | 规范禁止新增事实；校验原文、引用关系、新数字、常见工具及部分机构 / 项目名称 | 词法规则不能覆盖所有实体、暗示和因果夸大 |
+| 将“参与”变成“主导”，“了解”变成“精通” | 对职责范围和熟练程度升级设置校验；不能删除否定后声称具备技能 | 仍需人工确认改写没有改变事实含义 |
+| 把“未提及”当“不达标” | 区分表达、证据、资格缺口；资格不符需要明确依据，缺信息标为待确认 | 核实用户真实情况，不以简历缺字直接否定资格 |
+| 计划泛泛、重复或编造期限 | 校验动作与交付物、任务来源、优先级、稳定 ID / 文本重复、时间预算；无目标日期时 `due_date=null` | 语义近似去重、任务价值与估时合理性评估 |
+| 用学习任务“补齐”学历等资格 | 资格缺口必须保留为风险，仅允许待确认的核实任务 | 由用户判断是否继续投递，不制造虚假资格 |
+| 使用过期分析 | 简历定制结果带上游及简历指纹，准备计划检查其有效性 | 正式接入后还需完整的结果存储、失效及重试流程 |
+
+准备计划默认要求挑选 5–8 项有价值任务；信息不足、已有任务覆盖或时间不足时允许更少，甚至为零。转换函数保留已有任务和完成状态，待确认任务需显式采纳；它目前只返回兼容清单，**不会自动写库、创建日程、发送消息或修改简历**。
+
+正式接入还需处理一个明确问题：旧规则重新分析可能替换准备清单，必须先保证用户已采纳任务的保留机制。提示词也将 JD / 简历视为不可信数据，但提示注入防护效果需要真实模型评估，不能仅凭写入规则就宣称安全。
+
+## 08 · 指标设计：先定义怎样判断有效，再谈提升
+
+### 已观测到什么
+
+- 当前有本地功能实现、自动化测试和历史真实链接验证记录，没有可报告的线上用户量、转化率或节省时间数据。
+- 本次 README 核对运行了 **122 项离线规则 / 契约测试，全部通过**，覆盖文本与 URL 解析、排序、简历匹配、阶段与日程、Skill 校验等。未运行需要实际服务写入的 `*-api.test.mjs`。
+- URL 测试包含固定样例和模拟响应；历史真实链接验证见 [验证记录](docs/URL岗位导入说明与验证.md) 与 [后续适配记录](docs/URL岗位导入架构与扩展指南.md)。这些不是持续线上监测，也不代表对应网站所有链接今天都可用。
+- 尚无真实 LLM 输出评测，不能用校验器测试通过率代替模型效果。
+
+### 设计中的离线评估指标
+
+评估前需要建立按站点、岗位方向、页面类型分层的脱敏样本集，人工标注目标岗位、关键字段、要求与证据。以下只有口径设计，暂无实测百分比。
+
+| 指标 | 建议口径 / 用途 |
+| --- | --- |
+| URL 导入成功率 | 正确取得目标岗位且通过质量检查的链接数 / 抽样具体岗位链接数；另报下线、受限、解析失败原因 |
+| 核心字段识别完整率 | 正确提取的核心字段数 / 原页面实际提供的核心字段数；原本缺失的字段不强行补齐 |
+| 无关文本残留率 | 人工标注为导航、宣传、推荐等的输出文本量 / 提取文本总量；越低越好 |
+| 公司识别准确率 | 雇主识别正确的样本数 / 有明确雇主标注的样本数，单列第三方招聘平台 |
+| JD 要求覆盖率 | 正确保留的独立岗位要求数 / 人工标注要求数，检查必要 / 加分是否分错 |
+| 无依据推断率 | 无输入依据且被表述为事实的结论数 / 抽检结论数；合理且明确标记的推断单独评估 |
+| 结构化输出成功率 | 无需人工修复即可通过 Schema 与业务校验的输出次数 / 模型调用次数；首轮与重试后分开记录 |
+| Unsupported Suggestion Rate | 含无依据事实或夸大表述的简历建议数 / 抽检建议数；目标是降低，而非预设已达到零 |
+| Evidence Trace Rate | 可以定位原文且证据足以支持结论的建议数 / 应提供证据的建议数，结合自动定位与人工判断 |
+
+### 上线后再跟踪的使用指标
+
+- **简历建议采纳率：** 被用户采纳的建议数 / 实际展示的有效建议数，配合拒绝原因，避免只追求高采纳。
+- **准备清单完成率：** 同一批采纳任务在约定周期内的完成数 / 该批任务数，区分用户删除和计划失效。
+- **关键流程完成情况：** 从首次导入、保存简历到进入准备工作区的漏斗，观察断点而非只看访问量。
+
+当前没有业务埋点系统或数据分析 Dashboard；涉及简历和 JD 的评估数据应脱敏，并在明确告知与授权后采集。
+
+## 09 · 技术实现与数据边界
+
+| 层次 | 当前实现 |
+| --- | --- |
+| 运行环境与依赖 | Node.js `>=22.13.0`；项目声明 `pnpm@11.25.0`，使用 `pnpm-lock.yaml`；npm 执行项目脚本 |
+| 前端与路由 | React 19、TypeScript 5.9；Vite 8 + vinext `1.0.0-beta.5`，使用 Next.js 风格 App Router 与 API Route；不是常规 `next dev` 部署方式 |
+| UI | Tailwind CSS 4、现有 shadcn / Radix / Base UI 组件、Lucide 图标及 CSS 动画 |
+| 后端 | `app/api` 中的 Route Handler，Cloudflare Workers 运行时；本地使用 Wrangler 模拟 |
+| 数据存储 | Cloudflare D1（SQLite 体系）+ Drizzle ORM；本地数据位于 `.wrangler/state`，不是放在 `lib` 中 |
+| 网页 / 简历处理 | `parse5` 解析 HTML；站点公开详情数据适配；`pdfjs-dist` 在浏览器读取 PDF 文字 |
+| AI 相关 | 三套 Skill Markdown、JSON Schema、TypeScript 适配与校验；当前没有 LLM SDK 或模型请求执行器 |
+| 版本管理 | Git 完整提交与 GitHub 远程仓库；另有首次 Git 提交前的局部源码快照归档 |
+
+数据库主要包含 `jobs`、`resume_profiles`、`interview_reviews`。准备清单和流程 / 阶段记录复用岗位表中的 JSON 字段，未额外建立 Skill 输出数据库。浏览器本地存储只参与部分界面偏好，例如手动排序模式标记。
+
+<details>
+<summary><strong>代码导航：面试时可以从这里解释实现</strong></summary>
+
+```text
+app/                         首页、四大模块与阶段详情路由
+app/api/                     岗位 / 导入 / 简历 / 复盘 / 备份接口
+components/job-workspace.tsx  工作区交互、表单与岗位卡片
+components/pipeline-hub.tsx   六阶段任务工作区
+components/schedule-board.tsx 日程完成与撤销
+components/interview-library.tsx 题库与复盘
+lib/job-parser.ts            JD 文本字段解析
+lib/job-web-*.ts             URL 请求、站点识别、正文抽取与调度
+lib/job-web-adapters/        招聘站点 / 平台适配器
+lib/resume-matcher.ts        当前规则匹配与准备建议
+lib/resume-profile-server.ts 简历来源、缓存校验与重算
+lib/*-skill.ts              独立 Skill 输入 / 输出 / 校验 / 清单适配
+skills/                     三个 Skill 规范和 JSON Schema
+db/                         数据库连接与数据表定义
+drizzle/                    数据库迁移与结构快照
+tests/                      回归与契约测试、固定样例
+public/                     图片、Logo、PWA 静态资源
+history/pre-git-snapshots/   Git 建立前的局部源码片段
+.git/                       本机完整提交历史（不包含业务数据库）
+```
+
+新增站点一般只需增加 `canHandle / parse` 适配器、登记注册表并补充测试；字段标准化和岗位保存流程继续复用。Skill 的接口与 UI 分离，为以后选择不同模型执行器保留空间。
+
+</details>
+
+## 10 · 本地演示与项目状态
+
+当前以个人作品集和本地演示为主。仓库保留了早期 Sites 发布记录，但**尚未核验最新本地代码已同步到该线上版本，因此这里不提供一个未经确认的在线 Demo**。当前所有者工作区也不是已经开放注册的公共 SaaS。
+
+在已经配置好依赖、数据库和本地环境的工作区中，Windows 推荐：
+
+```powershell
+npm.cmd run build
+npm.cmd run local:preview
+```
+
+访问 `http://127.0.0.1:5173`。首次本地模拟登录入口为 `http://127.0.0.1:5173/signin-with-chatgpt?return_to=/`。这不是正式邮箱登录；`.env.local` 的本地模拟身份需按运行脚本设为 `OWNER_USER_ID=local_seedy`，不可当作公网认证方案。
+
+如果构建产物未变化，下次只需运行 `npm.cmd run local:preview`。修改源代码后需停止预览、重新构建再启动；该模式不提供源码热更新。
+
+项目也保留 `npm run dev`（Windows 可用 `npm.cmd run dev`）开发命令，但当前 Windows 环境曾在 Worker 开发连接阶段遇到 `ECONNRESET`，因此不把它作为本机稳定演示的默认入口。排查记录见 [Windows 启动诊断](docs/Windows开发启动ECONNRESET诊断.md)。
+
+**首次克隆需要额外准备：** 安装匹配的 Node / pnpm 并按锁文件安装依赖；配置 `.env.example` 对应的本地环境、`.openai/hosting.json` 的 D1 `DB` 绑定，以及数据库迁移。`.openai` 和真实环境文件不在 Git 中，不能假设克隆后仅执行两条命令就能启动。可参考 [本地运行说明](README-本地运行.md) 顶部的预览流程；其中较早的页面和功能描述可能滞后于当前代码。
+
+`.wrangler/state` 含本地岗位和简历数据，不要当作普通缓存删除。Git 保存源码版本；个人业务数据使用“资料导入与导出”另行备份。分享作品时使用脱敏材料，不提交真实简历、环境密钥或数据库。
+
+## 11 · Vibe Coding：我如何参与每一次迭代
+
+```text
+发现具体使用问题 → 定义目标与不做什么 → 拆分需求与验收条件
+  → 与 Codex 阅读现有代码、确认数据链路 → 最小修改
+  → 本地验证真实操作和异常场景 → 根据结果继续迭代 → Git 保存
+```
+
+我负责的是产品判断：例如哪些网页内容属于岗位、哪个阶段需要什么动作、自动排序何时应让位于用户、没有证据时系统应怎样回答。Codex 辅助代码分析、实现、排错和回归验证；生成代码之后仍然需要检查实际结果，而不是把一次生成当作完成。
+
+版本记录既保存结果，也保留决策的可追溯性。完整版本从 `10fda57` 开始；更早的 19 份局部源码快照存放在 [历史归档](history/pre-git-snapshots/README.md)，它们不是 19 套完整可运行项目，也不代表所有未保存的编辑都能恢复。
+
+```powershell
+git log --oneline --reverse
+git show 22d908b --stat
+npm.cmd run version:save -- "本次迭代说明"
+```
+
+`version:save` 保存本地 Git 提交，上传 GitHub 是另一步。当前远程配置指向 `lwj-lucky-forever/EasyToGetGoodJob`。
+
+## 12 · 截图 / GIF：建议用真实操作证明产品闭环
+
+以下是待补素材位，尚未放入截图，不以设计稿冒充已上线效果。建议保存到 `docs/screenshots/`，之后在对应位置插入图片；所有材料先脱敏。
+
+| 素材位 | 建议文件名 | 应展示什么 |
+| --- | --- | --- |
+| 首页主视觉 | `home.png` | 品牌、动态 Offer 元素和四大模块入口，可放在 README 标题之后 |
+| 岗位管理 | `jobs.png` | 公司聚合、匹配参考、优先级、下一项和排序，不展示真实私人求职记录 |
+| URL 导入 GIF | `url-import.gif` | 粘贴具体链接 → 直接填入表单 → 核对职责 / 要求 → 保存，体现去噪价值 |
+| 求职进度 | `pipeline.png` | 六阶段总入口，并补一个准备中或待投递工作区的展开状态 |
+| 匹配 / 简历建议 | `resume-match.png` | 当前规则分析的要求、证据、待确认和修改建议；明确标注“规则引擎” |
+| Skill 设计展示 | `skill-contract.png` | 用合成材料展示要求—证据映射和无依据建议被拒绝，标注“接口 / 校验示例，非真实 LLM 输出” |
+| 可选：日程 / 复盘 | `schedule.gif`、`interview-review.png` | 勾选完成再撤销，以及一条脱敏的面试回答—复盘—下一步记录 |
+
+## 13 · Roadmap
+
+### 已完成
+
+- 四大业务模块与门户入口，岗位收集、筛选比较、阶段推进、日程、复盘及备份。
+- 多层 URL 抽取与现有站点适配器；真实简历来源与缓存重算修复。
+- 三个 Skill 的独立规范、结构化接口、证据 / 时间 / 去重校验和测试。
+- 本地演示路径、Git 版本追溯与源码远程备份。
+
+### 当前推进方向：模型接入前的规范与验证准备
+
+已完成上述 Skill 契约，下一步是准备人工标注样本、确定模型执行器与结果存储方案。本节表示当前研发方向，**不表示模型调用、UI 集成或评估平台已经实现**。
+
+### Future · 尚未实现
+
+- 接入真实 LLM，将三个 Skill 串成可观测、可重试的后端 Workflow；补齐结果版本管理与用户采纳入口。
+- 验证模型的证据真实性、要求覆盖和建议质量，建立失败样本与回归评估。
+- 保护已采纳准备任务，完善与旧规则重分析的共存机制。
+- 面向中国大陆用户评估部署方案，完成独立邮箱注册登录、多用户隔离与公开演示环境。
+- 在隐私与授权边界内建设导入质量、建议采纳和准备完成情况 Dashboard。
+- 增加面试复盘 AI；在任务质量稳定后探索求职准备 Agent，保留外部操作确认。
+
+## What I learned / What this project demonstrates
+
+- **产品洞察：** 从“记录信息”进一步识别“机会判断与下一步行动”的问题。
+- **需求拆解与取舍：** 让四个模块各有职责，减少重复功能，保留用户对顺序和内容的控制。
+- **AI 产品思维：** 先定义输入、输出、证据、失败条件和评估方式，再决定如何接入模型。
+- **可靠性意识：** 区分事实、推断与未知；不给没有依据的建议包装成确定答案。
+- **Vibe Coding 实践：** 用明确需求、源码分析、实际验收和版本记录推动迭代，把想法变成可运行、可解释、能继续演进的产品。
