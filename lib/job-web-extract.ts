@@ -1,4 +1,5 @@
 import { parse, parseFragment, type DefaultTreeAdapterTypes } from "parse5";
+import { COMPETENCY_SECTION } from "./job-competencies.ts";
 import { parseJobText } from "./job-parser.ts";
 import { normalizeImportedJob, type ImportedJob, type WebJobDetails } from "./job-import.ts";
 import { inferKnownCompany, normalizeKnownCompany } from "./company-knowledge.mjs";
@@ -92,10 +93,11 @@ export function cleanJobContent(text: string) {
 export function splitWebJobSections(description: string, requirements = "") {
   const text = cleanJobContent(description).replace(/(^|\n)\s*(职责要求|工作要求|能力要求)\s*[:：]?/g, "$1任职要求：");
   const parsed = parseJobText(text);
+  const competencies = text.split("\n").some((line) => COMPETENCY_SECTION.test(line.trim())) ? parsed.competencies || "" : "";
   const headed = /(?:^|\n)\s*(?:岗位职责|职位职责|工作职责|工作内容|职位描述|岗位要求|职位要求|任职要求|任职资格|Responsibilities|Qualifications|Requirements)\s*[:：]?/im.test(text);
   const metadataLine = /^(?:日常实习|暑期实习|薪资|薪资待遇|薪资范围|实习时长|每周出勤|招聘对象|发布时间|发布日期|截止日期|截止时间|Salary)\s*[:：]/i;
   const explicit = cleanJobContent(requirements);
-  if (explicit && !headed) return { responsibilities: tidy(text.split("\n").filter((line) => !metadataLine.test(line)).join("\n")), requirements: explicit };
+  if (explicit && !headed) return { responsibilities: tidy(text.split("\n").filter((line) => !metadataLine.test(line)).join("\n")), requirements: explicit, competencies };
   let duties = headed ? parsed.responsibilities || "" : "";
   let inferredRequirements = headed ? parsed.requirements || "" : "";
   if (!headed) {
@@ -109,7 +111,7 @@ export function splitWebJobSections(description: string, requirements = "") {
     duties = dutyLines.join("\n");
     inferredRequirements = requirementLines.join("\n");
   }
-  return { responsibilities: tidy(duties), requirements: [...new Set([inferredRequirements, explicit].filter(Boolean))].join("\n") };
+  return { responsibilities: tidy(duties), requirements: [...new Set([inferredRequirements, explicit].filter(Boolean))].join("\n"), competencies };
 }
 
 function salaryText(value: unknown): string {
@@ -179,6 +181,7 @@ export function recordToJob(row: JobRecord, sourceUrl: string, method: string, d
   const description = cleanJobContent(textField(row, DUTIES));
   const requirement = cleanJobContent(textField(row, REQUIREMENTS));
   const sections = splitWebJobSections(description, requirement);
+  const competencies = cleanJobContent(textField(row, ["competencies", "keyCompetencies", "keySkills", "skillRequirements", "skills"])) || sections.competencies;
   const employmentType = textField(row, ["employmentType", "commitment"]);
   const recruitmentType = textField(row, ["recruit_type", "recruitTypeName", "recruitType", "recruitmentType", "jobTypeName"]) || defaults.recruitmentType || "";
   const scopedText = `${description}\n${requirement}`;
@@ -208,13 +211,14 @@ export function recordToJob(row: JobRecord, sourceUrl: string, method: string, d
     details.datePosted && `发布时间：${details.datePosted}`, deadline && `投递截止日期：${deadline}`,
     details.salary && `薪资待遇：${details.salary}`, details.department && `所属部门：${details.department}`,
     sections.responsibilities && `岗位职责：\n${sections.responsibilities}`, requirements && `任职要求：\n${requirements}`,
+    competencies && `重点考察能力：\n${competencies}`,
     details.otherInformation && `岗位补充信息：${details.otherInformation}`].filter(Boolean);
   const text = blocks.join("\n").slice(0, 50_000);
   const parsedText = parseJobText(text);
   const natureText = `${recruitmentType}\n${textField(row, ["job_subject", "jobType"])}\n${role}`;
   const nature = /暑期|summer.?intern/i.test(natureText) ? "暑期实习" : /实习|intern/i.test(natureText + employmentType) ? "日常实习" : /兼职|part.?time/i.test(employmentType) ? "兼职" : /校招|校园|graduate/i.test(recruitmentType) ? "校招" : /社招|社会招聘|society|experienced|social/i.test(recruitmentType) ? "其他" : "待确认";
   const parsed = normalizeImportedJob({ ...parsedText, company, role, location: jobLocation || parsedText.location, nature,
-    responsibilities: sections.responsibilities, requirements, sourceUrl, rawText: text, applicationDeadline: deadline, webDetails: details });
+    responsibilities: sections.responsibilities, requirements, competencies, sourceUrl, rawText: text, applicationDeadline: deadline, webDetails: details });
   const warnings = site.company && structuredCompany && site.company !== structuredCompany ? [`站点属于${site.company}，页面招聘主体为${structuredCompany}，请核对公司。`] : [];
   return { parsed, extractionMethod: method, warnings };
 }

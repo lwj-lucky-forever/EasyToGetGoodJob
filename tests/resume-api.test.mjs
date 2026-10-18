@@ -22,6 +22,8 @@ test('resume save, fallback, scope, persistent recalculation and job edits throu
     ids.push(job.id);
     assert.equal(job.matchScore, 0);
     assert.equal(job.matchAnalysis.resumeSource.name, null);
+    assert.match(job.competencies, /数据处理与分析/);
+    assert.match(job.competencies, /Excel/);
   }
   const before = (await api('/api/jobs')).jobs;
   const strong = '测试简历甲：本科，使用 Python 和 SQL 完成数据分析，使用 Excel 制作报表。';
@@ -63,5 +65,8 @@ test('resume save, fallback, scope, persistent recalculation and job edits throu
   const persisted = (await api('/api/jobs')).jobs.find(job => job.id === edited.id);
   assert.equal(persisted.matchAnalysis.inputKey, edited.matchAnalysis.inputKey);
   assert.deepEqual(persisted.processRecords, records);
+  const manual = (await api(`/api/jobs/${edited.id}`, 'PATCH', { competencies: '手动填写的专项能力' })).job;
+  assert.equal(manual.competencies, '手动填写的专项能力');
+  assert.equal((await api('/api/jobs')).jobs.find(job => job.id === edited.id).competencies, manual.competencies);
   for (const id of ids) await api(`/api/jobs/${id}`, 'DELETE');
 });

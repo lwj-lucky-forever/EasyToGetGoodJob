@@ -169,7 +169,7 @@ function JobForm({ draft, setDraft }: { draft: JobDraft; setDraft: React.Dispatc
 
   const recognitionLabels: Partial<Record<ImportPreviewKey, string>> = {
     company: "公司", role: "岗位", location: "地点", nature: "岗位性质", responsibilities: "工作内容",
-    requirements: "岗位要求", competencies: "考察能力", sourceUrl: "岗位链接", applicationDeadline: "投递截止日期",
+    requirements: "岗位要求", competencies: "重点考察能力", sourceUrl: "岗位链接", applicationDeadline: "投递截止日期",
   };
 
   return <div className="space-y-5">
@@ -196,7 +196,7 @@ function JobForm({ draft, setDraft }: { draft: JobDraft; setDraft: React.Dispatc
     </div>
     <div className="space-y-2"><Label htmlFor="responsibilities">工作内容</Label><Textarea id="responsibilities" value={draft.responsibilities} onChange={(e) => update("responsibilities", e.target.value)} placeholder="粘贴或概括岗位职责" className="min-h-24 text-base leading-6" /></div>
     <div className="space-y-2"><Label htmlFor="requirements">岗位要求</Label><Textarea id="requirements" value={draft.requirements} onChange={(e) => update("requirements", e.target.value)} placeholder="学历、专业、实习时长、技能等" className="min-h-24 text-base leading-6" /></div>
-    <div className="space-y-2"><Label htmlFor="competencies">重点考察能力</Label><Textarea id="competencies" value={draft.competencies} onChange={(e) => update("competencies", e.target.value)} placeholder="如：数据分析、沟通协调、产品思维、英语能力" className="min-h-20 text-base leading-6" /></div>
+    <div className="space-y-2"><Label htmlFor="competencies">重点考察能力</Label><p className="text-xs text-slate-500">从岗位职责和要求中归纳，并保留原文依据，可手动调整。</p><Textarea id="competencies" value={draft.competencies} onChange={(e) => update("competencies", e.target.value)} placeholder="如：数据分析、沟通协调、产品思维、英语能力" className="min-h-20 text-base leading-6" /></div>
   </div>;
 }
 

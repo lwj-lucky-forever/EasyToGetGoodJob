@@ -1,4 +1,5 @@
 import { inferKnownCompany, normalizeKnownCompany } from "./company-knowledge.mjs";
+import { COMPETENCY_HEADINGS, COMPETENCY_SECTION, fillJobCompetencies } from "./job-competencies.ts";
 
 export const JOB_NATURES = ["待确认", "日常实习", "暑期实习", "校招", "兼职", "其他"] as const;
 
@@ -32,7 +33,7 @@ const FIELD_MATCHERS: Array<[ParsedTextKey, RegExp]> = [
 const SECTION_MATCHERS: Array<[ContentKey, RegExp]> = [
   ["responsibilities", /^(?:工作内容|岗位职责|职位职责|工作职责|职位描述|岗位描述|工作描述|职责描述|岗位内容|主要职责|你的工作|你将负责|你会负责|你需要做|你将做什么|what\s+you(?:'|’)ll\s+do|responsibilit(?:y|ies))\s*[：:]?\s*(.*)$/i],
   ["requirements", /^(?:岗位基本要求|职位基本要求|基本任职要求|基本要求|岗位要求|任职要求|职位要求|招聘要求|应聘要求|任职资格|任职条件|岗位条件|招聘条件|资格要求|基本条件|我们希望你|我们期待你|希望你具备|你需要具备|你应当具备|优先条件|加分项|加分条件|qualifications?|requirements?|what\s+we(?:'|’)re\s+looking\s+for)\s*[：:]?\s*(.*)$/i],
-  ["competencies", /^(?:考察能力|核心能力|关键能力|重点能力|能力素质|胜任力|能力项|核心素质|能力要求)\s*[：:]?\s*(.*)$/i],
+  ["competencies", COMPETENCY_SECTION],
 ];
 
 const STOP_SECTION = /^(?:岗位亮点|职位亮点|薪资待遇|薪资范围|福利待遇|员工福利|公司介绍|团队介绍|关于我们|投递方式|申请方式|联系方式|招聘流程|其他说明|温馨提示|工作时间|发布日期|发布时间|更新时间|创建时间|职位编号|岗位编号|职位ID|岗位ID|职位类别|岗位类别|招聘人数|工作经验|学历要求|所属部门|所属团队|招聘对象|招聘批次|信息来源)\s*[：:]?\s*/i;
@@ -66,7 +67,7 @@ function prepareText(rawText: string) {
   const headingWords = [
     "工作内容", "岗位职责", "职位职责", "工作职责", "职位描述", "岗位描述", "工作描述", "主要职责",
     "岗位基本要求", "职位基本要求", "基本任职要求", "基本要求", "岗位要求", "任职要求", "职位要求", "招聘要求",
-    "任职资格", "任职条件", "岗位条件", "资格要求", "基本条件", "加分项", "优先条件", "考察能力", "核心能力",
+    "任职资格", "任职条件", "岗位条件", "资格要求", "基本条件", "加分项", "优先条件", ...COMPETENCY_HEADINGS,
     "工作地点", "办公地点", "工作城市", ...METADATA_HEADING_WORDS,
     "岗位信息", "职位信息", "招聘信息", "发布日期", "发布时间", "更新时间", "所属部门", "招聘部门", "事业群", "业务线",
     "职位类别", "岗位类别", "职位编号", "岗位编号", "招聘人数", "薪资范围", "学历要求", "专业要求", "经验要求", "语言要求",
@@ -74,7 +75,7 @@ function prepareText(rawText: string) {
   const sectionWords = [
     "工作内容", "岗位职责", "职位职责", "工作职责", "职位描述", "岗位描述", "工作描述", "主要职责",
     "岗位基本要求", "职位基本要求", "基本任职要求", "基本要求", "岗位要求", "任职要求", "职位要求", "招聘要求",
-    "任职资格", "任职条件", "岗位条件", "资格要求", "基本条件", "加分项", "优先条件", "考察能力", "核心能力",
+    "任职资格", "任职条件", "岗位条件", "资格要求", "基本条件", "加分项", "优先条件", ...COMPETENCY_HEADINGS,
   ].join("|");
   return rawText
     .replace(/\r/g, "")
@@ -252,7 +253,7 @@ export function parseJobText(rawText: unknown): Partial<ParsedJobFields> {
   if (nature) result.nature = nature;
   else delete result.nature;
 
-  return result;
+  return fillJobCompetencies(result);
 }
 
 export function mergeParsedJob<T extends Partial<ParsedJobFields>>(draft: T, parsed: Partial<ParsedJobFields>): T {
@@ -261,5 +262,5 @@ export function mergeParsedJob<T extends Partial<ParsedJobFields>>(draft: T, par
     if (!String(next[key] ?? "").trim() && parsed[key]) next[key] = parsed[key] as T[typeof key];
   }
   if ((!next.nature || next.nature === "待确认") && parsed.nature) next.nature = parsed.nature as T["nature"];
-  return next;
+  return fillJobCompetencies(next);
 }

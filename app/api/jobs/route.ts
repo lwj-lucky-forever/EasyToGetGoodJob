@@ -3,6 +3,7 @@ import { asc, desc, eq } from "drizzle-orm";
 import { getDb } from "../../../db";
 import { jobs } from "../../../db/schema";
 import { generatePrepChecklist } from "../../../lib/resume-matcher";
+import { fillJobCompetencies } from "../../../lib/job-competencies";
 import { parseJobText } from "../../../lib/job-parser";
 import { JOB_PRIORITIES, RESUME_VERSIONS, type JobPriority, type ResumeVersion } from "../../../lib/job-workflow";
 import { getJobAnalysis, loadResumeProfiles, refreshJobAnalysis } from "../../../lib/resume-profile-server";
@@ -55,7 +56,7 @@ export async function POST(request: Request) {
     const status = textValue(payload.status, 20);
     const responsibilities = textValue(payload.responsibilities) || parsed.responsibilities || "";
     const requirements = textValue(payload.requirements) || parsed.requirements || "";
-    const competencies = textValue(payload.competencies) || parsed.competencies || "";
+    const { competencies } = fillJobCompetencies({ responsibilities, requirements, competencies: textValue(payload.competencies) || parsed.competencies || "" });
     const submittedNature = textValue(payload.nature, 50);
     const nature = (!submittedNature || submittedNature === "待确认") && parsed.nature ? parsed.nature : submittedNature || "待确认";
     const submittedPriority = textValue(payload.priority, 20) as JobPriority;

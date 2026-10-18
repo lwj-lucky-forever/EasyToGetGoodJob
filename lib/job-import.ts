@@ -1,3 +1,4 @@
+import { fillJobCompetencies } from "./job-competencies.ts";
 import { JOB_NATURES, parseJobText, type ParsedJobFields } from "./job-parser.ts";
 
 export const WEB_DETAIL_LABELS = {
@@ -63,7 +64,7 @@ export function normalizeImportedJob(value: unknown): ImportedJob {
       if (text) output.webDetails[key] = text;
     }
   }
-  return output;
+  return fillJobCompetencies(output);
 }
 
 export function safelyParseJobText(value: unknown): ImportedJob {
