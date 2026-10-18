@@ -38,7 +38,7 @@ import { WORKSPACE_PATHS, type WorkspaceView } from "@/lib/workspace-routes";
 import { JOB_STATUSES, jobStatusLabel } from "@/lib/job-status";
 import { JOB_NATURES, mergeParsedJob, parseJobText } from "@/lib/job-parser";
 import type { MatchAnalysis, RequirementFit } from "@/lib/resume-matcher";
-import { normalizeImportedJob, recognizedImportKeys, safelyParseJobText, WEB_DETAIL_LABELS, type ImportedJob, type WebJobDetails } from "@/lib/job-import";
+import { normalizeImportedJob, recognizedImportKeys, safelyParseJobText, type ImportedJob } from "@/lib/job-import";
 import { groupJobsByCompany, numberGroupedJobs, orderJobGroups, hasStoredCustomOrder, MANUAL_ORDER_STORAGE_KEY } from "@/lib/job-order";
 import { getOptionalBrowserContext, registerOptionalBrowserTools, type BrowserToolDefinition } from "@/lib/optional-browser-tools";
 import {
@@ -63,7 +63,7 @@ type JobDraft = Pick<Job,
 >;
 type JobUpdate = Partial<JobDraft> & { processRecords?: ProcessRecord[]; prepChecklist?: PrepChecklistItem[] };
 type TextDraftKey = Exclude<keyof JobDraft, "status" | "priority" | "applicationDeadline" | "reminderAt" | "resumeVersion">;
-type ImportPreviewKey = TextDraftKey | "applicationDeadline";
+type ImportFieldKey = TextDraftKey | "applicationDeadline";
 
 const EMPTY_DRAFT: JobDraft = {
   company: "", role: "", location: "", nature: "待确认", status: "未投递", responsibilities: "",
@@ -106,14 +106,12 @@ function deadlineMeta(job: Job, now: number) {
 
 function JobForm({ draft, setDraft }: { draft: JobDraft; setDraft: React.Dispatch<React.SetStateAction<JobDraft>> }) {
   const [pasteOpen, setPasteOpen] = useState(Boolean(draft.rawText || draft.sourceUrl));
-  const [recognized, setRecognized] = useState<ImportPreviewKey[]>([]);
   const [importing, setImporting] = useState(false);
-  const [importPreview, setImportPreview] = useState<ImportedJob | null>(null);
   const [importWarnings, setImportWarnings] = useState<string[]>([]);
   function update<K extends keyof JobDraft>(key: K, value: JobDraft[K]) { setDraft((current) => ({ ...current, [key]: value })); }
 
   function applyRecognized(parsed: ImportedJob, originalRawText?: string) {
-    const keys = recognizedImportKeys(parsed) as ImportPreviewKey[];
+    const keys = recognizedImportKeys(parsed) as ImportFieldKey[];
     if (!keys.length) return 0;
     setDraft((current) => {
       const next: JobDraft = { ...current };
@@ -127,17 +125,17 @@ function JobForm({ draft, setDraft }: { draft: JobDraft; setDraft: React.Dispatc
       next.resumeVersion = recommendResumeVersion(next);
       return next;
     });
-    setRecognized(keys);
     return keys.length;
   }
 
   function analyze() {
     try {
       const parsed = safelyParseJobText(draft.rawText);
-      const keys = recognizedImportKeys(parsed) as ImportPreviewKey[];
+      const keys = recognizedImportKeys(parsed) as ImportFieldKey[];
       if (!keys.length) { toast.info("已保留原文，但没有识别到明确字段；请检查文本是否包含岗位名称、职责或要求"); return; }
-      setImportPreview({ ...parsed, rawText: draft.rawText }); setRecognized(keys); setImportWarnings([]);
-      toast.success(`已识别${keys.length}项信息，请确认后应用`);
+      const count = applyRecognized(parsed, draft.rawText);
+      setImportWarnings([]);
+      toast.success(`已识别并填充${count}项信息，可在下方继续编辑`);
     } catch {
       toast.error("文本识别没有完成，原文已保留，可手动填写或稍后重试");
     }
@@ -146,6 +144,7 @@ function JobForm({ draft, setDraft }: { draft: JobDraft; setDraft: React.Dispatc
   async function importFromUrl() {
     if (!draft.sourceUrl.trim()) { toast.error("请先粘贴招聘网页链接"); return; }
     setImporting(true);
+    setImportWarnings([]);
     try {
       const response = await fetch("/api/jobs/import-url", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ url: normalizeUrl(draft.sourceUrl) }) });
       const contentType = response.headers.get("content-type") ?? "";
@@ -158,29 +157,26 @@ function JobForm({ draft, setDraft }: { draft: JobDraft; setDraft: React.Dispatc
         rawText: typeof data.rawText === "string" ? data.rawText : "",
         applicationDeadline: data.applicationDeadline,
       });
-      const keys = recognizedImportKeys(parsed) as ImportPreviewKey[];
+      const keys = recognizedImportKeys(parsed) as ImportFieldKey[];
       if (!keys.length) throw new Error("网页已读取，但没有识别到有效岗位字段；请改用文本粘贴");
       const warnings = Array.isArray(data.warnings) ? data.warnings.filter((item): item is string => typeof item === "string").slice(0, 3) : [];
-      setImportPreview(parsed); setRecognized(keys); setImportWarnings(warnings);
-      toast.success(`已从网页识别${keys.length}项岗位信息，请确认后应用`);
+      const count = applyRecognized(parsed, parsed.rawText ?? draft.rawText);
+      setImportWarnings(warnings);
+      toast.success(`已从网页填充${count}项岗位信息，可在下方继续编辑`);
     } catch (error) { toast.error(error instanceof Error ? error.message : "网页读取失败，请改用文本粘贴"); }
     finally { setImporting(false); }
   }
 
-  const recognitionLabels: Partial<Record<ImportPreviewKey, string>> = {
-    company: "公司", role: "岗位", location: "地点", nature: "岗位性质", responsibilities: "工作内容",
-    requirements: "岗位要求", competencies: "重点考察能力", sourceUrl: "岗位链接", applicationDeadline: "投递截止日期",
-  };
 
   return <div className="space-y-5">
     <section className="overflow-hidden rounded-[1.35rem] border border-indigo-200/70 bg-gradient-to-br from-indigo-50 via-white to-sky-50 shadow-sm shadow-indigo-100/60">
       <button type="button" onClick={() => setPasteOpen((open) => !open)} className="flex w-full items-center justify-between gap-3 px-5 py-4 text-left"><span className="flex items-center gap-3 text-sm font-bold text-slate-900"><span className="grid size-8 place-items-center rounded-xl bg-indigo-600 text-white"><Sparkles className="size-4" /></span><span>智能导入岗位<span className="ml-2 hidden text-xs font-medium text-slate-500 sm:inline">支持网页链接或完整文本</span></span></span><ChevronDown className={`size-4 text-indigo-600 transition ${pasteOpen ? "rotate-180" : ""}`} /></button>
       {pasteOpen && <div className="space-y-4 border-t border-indigo-100/80 p-4 sm:p-5">
-        <div className="space-y-2"><Label htmlFor="import-url" className="flex items-center gap-2"><Link2 className="size-4 text-indigo-500" />招聘网页链接</Label><div className="flex flex-col gap-2 sm:flex-row"><Input id="import-url" value={draft.sourceUrl} onChange={(event) => update("sourceUrl", event.target.value)} placeholder="粘贴招聘官网、招聘平台的岗位网页" className="h-11 rounded-xl bg-white" /><Button type="button" onClick={() => void importFromUrl()} disabled={importing || !draft.sourceUrl.trim()} className="h-11 shrink-0 rounded-xl bg-slate-950 hover:bg-indigo-700">{importing ? <Loader2 className="size-4 animate-spin" /> : <Link2 className="size-4" />}{importing ? "读取中" : "读取网页"}</Button></div><p className="text-xs leading-5 text-slate-500">优先读取具体岗位的结构化详情，支持阿里校招、字节、百度、小米、小红书及美团、Moka 等招聘页；登录或安全验证页请改用文本粘贴。</p></div>
+        <div className="space-y-2"><Label htmlFor="import-url" className="flex items-center gap-2"><Link2 className="size-4 text-indigo-500" />招聘网页链接</Label><div className="flex flex-col gap-2 sm:flex-row"><Input id="import-url" value={draft.sourceUrl} onChange={(event) => update("sourceUrl", event.target.value)} placeholder="粘贴招聘官网、招聘平台的岗位网页" className="h-11 rounded-xl bg-white" /><Button type="button" onClick={() => void importFromUrl()} disabled={importing || !draft.sourceUrl.trim()} className="h-11 shrink-0 rounded-xl bg-slate-950 hover:bg-indigo-700">{importing ? <Loader2 className="size-4 animate-spin" /> : <Link2 className="size-4" />}{importing ? "导入中" : "导入并填充"}</Button></div><p className="text-xs leading-5 text-slate-500">优先读取具体岗位的结构化详情，支持阿里校招、字节、百度、小米、小红书及美团、Moka 等招聘页；登录或安全验证页请改用文本粘贴。</p></div>
         <div className="flex items-center gap-3 text-xs font-medium text-slate-400"><span className="h-px flex-1 bg-indigo-100" />或粘贴岗位文字<span className="h-px flex-1 bg-indigo-100" /></div>
-        <Textarea value={draft.rawText} onChange={(event) => { update("rawText", event.target.value); setRecognized([]); setImportPreview(null); setImportWarnings([]); }} placeholder={"直接粘贴完整招聘信息，无需整理格式。\n系统会识别公司、岗位、地点、岗位性质、工作内容和岗位要求。"} className="min-h-36 resize-y rounded-2xl border-indigo-100 bg-white/90 text-base leading-7" />
-        {importPreview && recognized.length > 0 && <div className="space-y-3 rounded-2xl border border-emerald-200 bg-emerald-50/80 p-4"><div><p className="font-bold text-emerald-900">识别结果预览</p><p className="mt-1 text-xs text-emerald-700">确认后才会覆盖下方表单，请先检查关键信息。</p></div>{importWarnings.length > 0 && <div className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs leading-5 text-amber-800">{importWarnings.map((warning) => <p key={warning}>• {warning}</p>)}</div>}<div className="grid gap-2 sm:grid-cols-2">{recognized.map((key) => <div key={key} className="rounded-xl bg-white px-3 py-2 shadow-sm"><p className="text-xs font-semibold text-slate-400">{recognitionLabels[key] ?? key}</p><p className="mt-1 line-clamp-2 text-sm leading-5 text-slate-700">{String(importPreview[key] ?? "")}</p></div>)}{Object.entries(importPreview.webDetails ?? {}).map(([key, value]) => <div key={`web-${key}`} className="rounded-xl bg-white px-3 py-2 shadow-sm"><p className="text-xs font-semibold text-slate-400">{WEB_DETAIL_LABELS[key as keyof WebJobDetails]}</p><p className="mt-1 whitespace-pre-line text-sm leading-5 text-slate-700">{value}</p></div>)}</div>{importPreview.webDetails && <p className="text-xs text-emerald-700">发布时间、学历、专业等补充信息将随岗位原文保留；原网页未提供的字段会留空。</p>}<div className="flex justify-end gap-2"><Button type="button" size="sm" variant="outline" onClick={() => { setImportPreview(null); setRecognized([]); setImportWarnings([]); }}>取消</Button><Button type="button" size="sm" onClick={() => { const count = applyRecognized(importPreview, importPreview.rawText ?? draft.rawText); setImportPreview(null); setImportWarnings([]); toast.success(`已应用${count}项信息，请继续检查和保存`); }} className="bg-emerald-600 hover:bg-emerald-700">确认并应用</Button></div></div>}
-        <div className="flex justify-end"><Button type="button" size="sm" onClick={analyze} disabled={!draft.rawText.trim()} className="rounded-xl bg-indigo-600 hover:bg-indigo-700"><Sparkles className="size-4" />识别文本并填充</Button></div>
+        <Textarea value={draft.rawText} onChange={(event) => { update("rawText", event.target.value); setImportWarnings([]); }} placeholder={"直接粘贴完整招聘信息，无需整理格式。\n系统会识别公司、岗位、地点、岗位性质、工作内容和岗位要求。"} className="min-h-36 resize-y rounded-2xl border-indigo-100 bg-white/90 text-base leading-7" />
+        {importWarnings.length > 0 && <div role="status" className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs leading-5 text-amber-800">{importWarnings.map((warning) => <p key={warning}>• {warning}</p>)}</div>}
+        <div className="flex justify-end"><Button type="button" size="sm" onClick={analyze} disabled={importing || !draft.rawText.trim()} className="rounded-xl bg-indigo-600 hover:bg-indigo-700"><Sparkles className="size-4" />识别文本并填充</Button></div>
       </div>}
     </section>
 
