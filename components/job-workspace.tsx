@@ -37,6 +37,7 @@ import { SiteNavigation } from "@/components/site-navigation";
 import { WORKSPACE_PATHS, type WorkspaceView } from "@/lib/workspace-routes";
 import { JOB_STATUSES, jobStatusLabel } from "@/lib/job-status";
 import { JOB_NATURES, mergeParsedJob, parseJobText } from "@/lib/job-parser";
+import type { MatchAnalysis, RequirementFit } from "@/lib/resume-matcher";
 import { normalizeImportedJob, recognizedImportKeys, safelyParseJobText, WEB_DETAIL_LABELS, type ImportedJob, type WebJobDetails } from "@/lib/job-import";
 import { groupJobsByCompany, numberGroupedJobs, orderJobGroups, hasStoredCustomOrder, MANUAL_ORDER_STORAGE_KEY } from "@/lib/job-order";
 import { getOptionalBrowserContext, registerOptionalBrowserTools, type BrowserToolDefinition } from "@/lib/optional-browser-tools";
@@ -48,14 +49,6 @@ import {
 const STATUSES = JOB_STATUSES;
 const NATURES = JOB_NATURES;
 type Status = (typeof STATUSES)[number];
-type RequirementFit = "匹配" | "部分匹配" | "需补充" | "待确认";
-
-type RequirementAnalysis = { requirement: string; fit: RequirementFit; score: number; evidence: string; action: string; knowledge: string };
-type MatchAnalysis = {
-  score: number; level: "高" | "中高" | "中等" | "较低"; summary: string; requirements: RequirementAnalysis[];
-  strengths: string[]; priorities: string[]; basis: string; resumeVersion: ResumeVersion;
-  recommendedResumeVersion: ResumeVersion; version: number; analyzedAt: string;
-};
 type Job = {
   id: number; company: string; role: string; location: string; nature: string; status: Status;
   responsibilities: string; requirements: string; competencies: string; sourceUrl: string; rawText: string;
@@ -228,7 +221,7 @@ function MatchDialog({ job, open, onOpenChange, onReanalyze, onChecklistToggle, 
   return <Dialog open={open} onOpenChange={onOpenChange}><DialogContent className="[&>[data-slot=dialog-close]]:z-20 max-h-[94vh] overflow-y-auto rounded-[1.75rem] border-slate-200 p-0 shadow-2xl sm:max-w-4xl">
     <DialogHeader className="sticky top-0 z-20 border-b border-slate-100 bg-white/95 px-6 py-5 backdrop-blur"><div className="flex items-start justify-between gap-4 pr-8"><div><DialogTitle className="text-xl">岗位匹配与准备</DialogTitle><DialogDescription className="mt-1">{job.company} · {job.role}</DialogDescription></div><Button variant="outline" size="sm" onClick={() => onReanalyze(job)} disabled={analyzing || Boolean(checklistSavingId)} className="rounded-xl"><RefreshCw className={`size-4 ${analyzing ? "animate-spin" : ""}`} />重新分析</Button></div></DialogHeader>
     <div className="space-y-6 px-6 py-6">
-      <section className="relative grid gap-4 overflow-hidden rounded-[1.4rem] bg-gradient-to-br from-slate-950 via-indigo-950 to-indigo-800 p-6 text-white shadow-xl shadow-indigo-200/40 sm:grid-cols-[150px_1fr] sm:items-center"><div className="pointer-events-none absolute -right-12 -top-16 size-44 rounded-full bg-sky-400/15 blur-2xl" /><div className="text-center sm:border-r sm:border-white/15"><p className="text-5xl font-bold tracking-tight">{analysis.score}<span className="text-xl text-white/60">%</span></p><p className="mt-2 text-sm font-semibold text-sky-200">{analysis.level}匹配</p></div><div><p className="text-base font-semibold">整体判断</p><p className="mt-2 text-sm leading-6 text-slate-300">{analysis.summary}</p><div className="mt-3 flex flex-wrap gap-2 text-xs"><span className="rounded-full bg-white/10 px-2.5 py-1">当前：{job.resumeVersion}</span><span className="rounded-full bg-sky-400/15 px-2.5 py-1 text-sky-100">推荐：{analysis.recommendedResumeVersion}</span></div></div></section>
+      <section className="relative grid gap-4 overflow-hidden rounded-[1.4rem] bg-gradient-to-br from-slate-950 via-indigo-950 to-indigo-800 p-6 text-white shadow-xl shadow-indigo-200/40 sm:grid-cols-[150px_1fr] sm:items-center"><div className="pointer-events-none absolute -right-12 -top-16 size-44 rounded-full bg-sky-400/15 blur-2xl" /><div className="text-center sm:border-r sm:border-white/15"><p className="text-5xl font-bold tracking-tight">{analysis.score}<span className="text-xl text-white/60">%</span></p><p className="mt-2 text-sm font-semibold text-sky-200">{analysis.level}匹配</p></div><div><p className="text-base font-semibold">整体判断</p><p className="mt-2 text-sm leading-6 text-slate-300">{analysis.summary}</p><div className="mt-3 flex flex-wrap gap-2 text-xs"><span className="rounded-full bg-white/10 px-2.5 py-1">实际简历：{analysis.resumeSource.name ?? "未上传"}</span><span className="rounded-full bg-sky-400/15 px-2.5 py-1 text-sky-100">建议方向：{analysis.recommendedResumeVersion}</span>{analysis.resumeSource.updatedAt && <span className="rounded-full bg-white/10 px-2.5 py-1">简历保存于：{new Date(analysis.resumeSource.updatedAt).toLocaleString("zh-CN")}</span>}</div></div></section>
       <section className="rounded-2xl border border-indigo-100 bg-indigo-50/50 p-4"><div className="flex flex-wrap items-center justify-between gap-3"><div><h3 className="flex items-center gap-2 font-bold text-slate-900"><ListChecks className="size-5 text-indigo-600" />岗位准备清单</h3><p className="mt-1 text-sm text-slate-500">由匹配差距自动生成，勾选状态会持续保存。</p></div><span className="rounded-full bg-white px-3 py-1 text-sm font-semibold text-indigo-700 shadow-sm">{completed}/{job.prepChecklist.length} 已完成</span></div><div className="mt-4 h-2 overflow-hidden rounded-full bg-white"><div className="h-full rounded-full bg-gradient-to-r from-indigo-500 to-sky-400 transition-all" style={{ width: `${job.prepChecklist.length ? Math.round(completed / job.prepChecklist.length * 100) : 0}%` }} /></div><div className="mt-4 space-y-2">{job.prepChecklist.length ? job.prepChecklist.map((item) => <label key={item.id} className={`flex cursor-pointer items-start gap-3 rounded-xl border p-3 transition ${item.done ? "border-emerald-100 bg-emerald-50/70" : "border-slate-200 bg-white hover:border-indigo-200"}`}><Checkbox checked={item.done} disabled={Boolean(checklistSavingId) || analyzing} onCheckedChange={() => onChecklistToggle(job, item.id)} className="mt-0.5" /><span className="min-w-0 flex-1"><span className={`text-sm leading-6 ${item.done ? "text-slate-400 line-through" : "text-slate-700"}`}>{item.text}</span><span className="ml-2 rounded-full bg-slate-100 px-2 py-0.5 text-xs text-slate-500">{item.category}</span></span></label>) : <p className="rounded-xl bg-white px-4 py-5 text-center text-sm text-slate-500">当前没有需要额外补充的清单项。</p>}</div></section>
       <section className="grid gap-4 md:grid-cols-2"><div className="rounded-2xl border border-emerald-100 bg-emerald-50/60 p-4"><p className="flex items-center gap-2 font-semibold text-emerald-800"><CircleCheckBig className="size-4" />你的主要优势</p><ul className="mt-3 space-y-2 text-sm leading-6 text-slate-600">{analysis.strengths.map((item) => <li key={item} className="flex gap-2"><span className="mt-2 size-1.5 shrink-0 rounded-full bg-emerald-500" />{item}</li>)}</ul></div><div className="rounded-2xl border border-amber-100 bg-amber-50/60 p-4"><p className="flex items-center gap-2 font-semibold text-amber-800"><GraduationCap className="size-4" />优先补充方向</p><ul className="mt-3 space-y-2 text-sm leading-6 text-slate-600">{analysis.priorities.map((item) => <li key={item} className="flex gap-2"><span className="mt-2 size-1.5 shrink-0 rounded-full bg-amber-500" />{item}</li>)}</ul></div></section>
       <section><div className="mb-3"><h3 className="text-lg font-bold">逐条岗位要求解读</h3><p className="mt-1 text-sm text-slate-500">每一条都给出简历证据、行动建议与需要补充的知识。</p></div><div className="space-y-3">{analysis.requirements.map((item, index) => { const config = FIT_STYLE[item.fit]; const FitIcon = config.icon; return <article key={`${item.requirement}-${index}`} className="rounded-2xl border border-slate-200/80 bg-white p-4 shadow-sm"><div className="flex items-start justify-between gap-3"><div className="flex gap-3"><span className="grid size-7 shrink-0 place-items-center rounded-lg bg-slate-100 text-sm font-bold text-slate-500">{index + 1}</span><p className="font-semibold leading-6 text-slate-900">{item.requirement}</p></div><span className={`flex shrink-0 items-center gap-1 rounded-full border px-2.5 py-1 text-xs font-semibold ${config.className}`}><FitIcon className="size-3.5" />{item.fit}</span></div><div className="mt-4 grid gap-3 text-sm leading-6 md:grid-cols-3"><div className="rounded-xl bg-slate-50 p-3"><p className="mb-1 font-semibold text-slate-500">简历证据</p><p className="text-slate-700">{item.evidence}</p></div><div className="rounded-xl bg-indigo-50/80 p-3"><p className="mb-1 font-semibold text-indigo-600">你应该怎么做</p><p className="text-slate-700">{item.action}</p></div><div className="rounded-xl bg-amber-50/70 p-3"><p className="mb-1 font-semibold text-amber-700">需要补充</p><p className="text-slate-700">{item.knowledge}</p></div></div></article>; })}</div></section>
@@ -303,6 +296,9 @@ export default function JobWorkspace({ initialView = "岗位管理", pipelineSta
       try { rememberedManualOrder = window.localStorage.getItem(MANUAL_ORDER_STORAGE_KEY) === "true"; } catch { /* Storage may be unavailable; existing positions remain usable. */ }
       setHasManualOrder((current) => current || rememberedManualOrder || hasStoredCustomOrder(data.jobs!));
       setJobs(data.jobs); setAccessState("ready");
+      setAnalysisJob((current) => current ? data.jobs!.find((job) => job.id === current.id) ?? null : null);
+      setDetailJob((current) => current ? data.jobs!.find((job) => job.id === current.id) ?? null : null);
+      return data.jobs;
     } catch (loadError) {
       if (requestId === loadRequestId.current) setError(loadError instanceof Error && !/abort|timeout/i.test(loadError.name) ? loadError.message : "连接超时，请点击重新加载；已保存的岗位不会被清空。");
     } finally { if (requestId === loadRequestId.current) setLoading(false); }
@@ -454,17 +450,9 @@ export default function JobWorkspace({ initialView = "岗位管理", pipelineSta
     catch (analysisError) { toast.error(analysisError instanceof Error ? analysisError.message : "分析失败，请稍后重试"); }
     finally { setAnalyzing(false); }
   }
-  async function matchResumeVersion(version: ResumeVersion) {
-    const relevantJobs = jobs.filter((job) => job.resumeVersion === version);
-    let matched = 0;
-    for (const job of relevantJobs) {
-      const response = await fetch(`/api/jobs/${job.id}/analyze`, { method: "POST" });
-      if (!response.ok) break;
-      matched++;
-    }
-    await loadJobs();
-    if (matched !== relevantJobs.length) throw new Error("部分岗位匹配未完成");
-    return matched;
+  async function refreshResumeMatches() {
+    // Saving the resume refreshes matches server-side, even when the browser closes.
+    return Boolean(await loadJobs());
   }
   async function toggleChecklist(job: Job, itemId: string) {
     const nextChecklist = job.prepChecklist.map((item) => item.id === itemId ? { ...item, done: !item.done } : item);
@@ -513,8 +501,8 @@ export default function JobWorkspace({ initialView = "岗位管理", pipelineSta
     </div>
     <Dialog open={dialogOpen} onOpenChange={setDialogOpen}><DialogContent className="[&>[data-slot=dialog-close]]:z-20 max-h-[92vh] overflow-y-auto rounded-[1.75rem] border-slate-200 p-0 shadow-2xl sm:max-w-3xl"><DialogHeader className="sticky top-0 z-10 border-b border-slate-100 bg-white/95 px-6 py-5 backdrop-blur"><DialogTitle className="text-xl">{editingId ? "编辑岗位" : "新增意向岗位"}</DialogTitle><DialogDescription>粘贴网页链接或岗位文字，保存后自动生成匹配分析与准备清单。</DialogDescription></DialogHeader><div className="px-6 py-2"><JobForm draft={draft} setDraft={setDraft} /></div><DialogFooter className="sticky bottom-0 border-t border-slate-100 bg-white/95 px-6 py-4 backdrop-blur"><Button variant="outline" onClick={() => setDialogOpen(false)} className="rounded-xl">取消</Button><Button onClick={() => void saveJob()} disabled={saving} className="rounded-xl bg-indigo-600 px-5 hover:bg-indigo-700">{saving ? "保存中…" : "保存并生成分析"}</Button></DialogFooter></DialogContent></Dialog>
     <JobDetailDialog job={detailJob} open={Boolean(detailJob)} onOpenChange={(open) => { if (!open) setDetailJob(null); }} onEdit={(job) => { setDetailJob(null); openEdit(job as Job); }} onPrepare={(job) => { setDetailJob(null); setAnalysisJob(job as Job); }} />
-    <Dialog open={backupOpen} onOpenChange={setBackupOpen}><DialogContent className="max-h-[92vh] overflow-y-auto rounded-2xl sm:max-w-4xl"><DialogHeader><DialogTitle>资料导入与导出</DialogTitle><DialogDescription>导出、迁移和恢复求职资料。</DialogDescription></DialogHeader><DataBackupPanel jobCount={jobs.length} onRestored={loadJobs} /></DialogContent></Dialog>
-    <ResumeManagerDialog open={resumeManagerOpen} onOpenChange={setResumeManagerOpen} onSaved={matchResumeVersion} />
+    <Dialog open={backupOpen} onOpenChange={setBackupOpen}><DialogContent className="max-h-[92vh] overflow-y-auto rounded-2xl sm:max-w-4xl"><DialogHeader><DialogTitle>资料导入与导出</DialogTitle><DialogDescription>导出、迁移和恢复求职资料。</DialogDescription></DialogHeader><DataBackupPanel jobCount={jobs.length} onRestored={async () => { await loadJobs(); }} /></DialogContent></Dialog>
+    <ResumeManagerDialog open={resumeManagerOpen} onOpenChange={setResumeManagerOpen} onSaved={refreshResumeMatches} />
     <MatchDialog job={analysisJob} open={Boolean(analysisJob)} onOpenChange={(open) => { if (!open) setAnalysisJob(null); }} onReanalyze={(job) => void reanalyze(job)} onChecklistToggle={(job, itemId) => void toggleChecklist(job, itemId)} analyzing={analyzing} checklistSavingId={checklistSavingId} />
     <ProcessDialog job={processJob} open={Boolean(processJob)} onOpenChange={(open) => { if (!open) setProcessJob(null); }} onSave={saveProcessRecords} />
     <AlertDialog open={Boolean(deleting)} onOpenChange={(open) => { if (!open) setDeleting(null); }}><AlertDialogContent><AlertDialogHeader><AlertDialogTitle>删除这个岗位？</AlertDialogTitle><AlertDialogDescription>“{deleting?.company} · {deleting?.role}”及其投递记录将被永久删除。</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel>取消</AlertDialogCancel><AlertDialogAction variant="destructive" onClick={() => void deleteJob()}>确认删除</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog>

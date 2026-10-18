@@ -1,9 +1,9 @@
 import { env } from "cloudflare:workers";
 import { eq } from "drizzle-orm";
 import { getDb } from "../../../db";
-import { resumeProfiles } from "../../../db/schema";
+import { jobs, resumeProfiles } from "../../../db/schema";
 import { RESUME_VERSIONS, type ResumeVersion } from "../../../lib/job-workflow";
-import { DEFAULT_RESUME_PROFILES } from "../../../lib/resume-profiles";
+import { loadResumeProfiles, refreshJobAnalysis } from "../../../lib/resume-profile-server";
 
 function authorizedOwner(request: Request) {
   const userId = request.headers.get("oai-authenticated-user-id");
@@ -18,7 +18,7 @@ export async function GET(request: Request) {
   try {
     const rows = await getDb().select().from(resumeProfiles).where(eq(resumeProfiles.ownerId, auth.userId));
     const stored = new Map(rows.map((row) => [row.name, row]));
-    return Response.json({ profiles: RESUME_VERSIONS.map((name) => ({ name, content: stored.get(name)?.content || DEFAULT_RESUME_PROFILES[name], updatedAt: stored.get(name)?.updatedAt || "" })) });
+    return Response.json({ profiles: RESUME_VERSIONS.map((name) => ({ name, content: stored.get(name)?.content || "", updatedAt: stored.get(name)?.updatedAt || "" })) }, { headers: { "Cache-Control": "no-store" } });
   } catch {
     return Response.json({ error: "暂时无法读取简历版本" }, { status: 500 });
   }
@@ -34,9 +34,25 @@ export async function PUT(request: Request) {
     if (!RESUME_VERSIONS.includes(name)) return Response.json({ error: "简历版本无效" }, { status: 400 });
     if (content.length < 20) return Response.json({ error: "请填写更完整的简历内容" }, { status: 400 });
     const updatedAt = new Date().toISOString();
-    const [profile] = await getDb().insert(resumeProfiles).values({ ownerId: auth.userId, name, content, updatedAt })
+    const db = getDb();
+    const saveProfile = db.insert(resumeProfiles).values({ ownerId: auth.userId, name, content, updatedAt })
       .onConflictDoUpdate({ target: [resumeProfiles.ownerId, resumeProfiles.name], set: { content, updatedAt } }).returning();
-    return Response.json({ profile });
+    // Applying to all jobs changes their existing version selector, not other saved resumes.
+    const [saved] = payload.applyToAllJobs === true
+      ? await db.batch([saveProfile, db.update(jobs).set({ resumeVersion: name }).where(eq(jobs.ownerId, auth.userId))])
+      : [await saveProfile];
+    const profile = saved[0];
+    let updatedJobs = 0;
+    let refreshPending = false;
+    try {
+      const profiles = await loadResumeProfiles(auth.userId);
+      const rows = await db.select().from(jobs).where(eq(jobs.ownerId, auth.userId));
+      for (const row of rows) {
+        const result = await refreshJobAnalysis(row, profiles);
+        if (result.matchAnalysis.resumeSource.name === name) updatedJobs++;
+      }
+    } catch { refreshPending = true; } // A subsequent GET validates and repairs stale caches.
+    return Response.json({ profile, updatedJobs, refreshPending });
   } catch {
     return Response.json({ error: "暂时无法保存简历版本" }, { status: 500 });
   }

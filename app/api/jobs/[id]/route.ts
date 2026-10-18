@@ -2,7 +2,7 @@ import { env } from "cloudflare:workers";
 import { and, eq } from "drizzle-orm";
 import { getDb } from "../../../../db";
 import { jobs } from "../../../../db/schema";
-import { analyzeJob, generatePrepChecklist, presentJob } from "../../../../lib/resume-matcher";
+import { generatePrepChecklist } from "../../../../lib/resume-matcher";
 import { parseJobText } from "../../../../lib/job-parser";
 import {
   JOB_PRIORITIES,
@@ -13,7 +13,7 @@ import {
   type JobPriority,
   type ResumeVersion,
 } from "../../../../lib/job-workflow";
-import { getResumeProfileContent } from "../../../../lib/resume-profile-server";
+import { getJobAnalysis, refreshJobAnalysis } from "../../../../lib/resume-profile-server";
 
 const STATUSES = new Set(["未投递", "准备中", "已投递", "笔试", "面试", "Offer", "暂停"]);
 const FIELDS = ["company", "role", "location", "nature", "status", "responsibilities", "requirements", "competencies", "sourceUrl", "rawText", "priority", "applicationDeadline", "reminderAt", "resumeVersion"] as const;
@@ -74,15 +74,14 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     if ("resumeVersion" in values && !RESUME_VERSIONS.includes(String(values.resumeVersion) as ResumeVersion)) return Response.json({ error: "简历版本无效" }, { status: 400 });
     if (FIELDS.some((field) => ANALYSIS_FIELDS.has(field) && field in payload)) {
       const selectedResumeVersion = String(values.resumeVersion ?? existing.resumeVersion);
-      const resumeContent = await getResumeProfileContent(auth.userId, selectedResumeVersion);
-      const analysis = analyzeJob({
+      const analysis = await getJobAnalysis(auth.userId, {
         role: String(values.role ?? existing.role),
         responsibilities: String(values.responsibilities ?? existing.responsibilities),
         requirements: String(values.requirements ?? existing.requirements),
         competencies: String(values.competencies ?? existing.competencies),
         rawText: String(values.rawText ?? existing.rawText),
         resumeVersion: selectedResumeVersion,
-      }, resumeContent);
+      });
       values.matchScore = analysis.score;
       values.matchLevel = analysis.level;
       values.analysisJson = JSON.stringify(analysis);
@@ -94,7 +93,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
       }
     }
     const [job] = await db.update(jobs).set(values).where(and(eq(jobs.id, id), eq(jobs.ownerId, auth.userId))).returning();
-    return Response.json({ job: presentJob(job) });
+    return Response.json({ job: await refreshJobAnalysis(job) });
   } catch {
     return Response.json({ error: "暂时无法更新岗位，请稍后重试" }, { status: 500 });
   }

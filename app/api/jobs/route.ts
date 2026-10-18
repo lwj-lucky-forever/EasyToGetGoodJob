@@ -2,10 +2,10 @@ import { env } from "cloudflare:workers";
 import { asc, desc, eq } from "drizzle-orm";
 import { getDb } from "../../../db";
 import { jobs } from "../../../db/schema";
-import { analyzeJob, generatePrepChecklist, presentJob } from "../../../lib/resume-matcher";
+import { generatePrepChecklist } from "../../../lib/resume-matcher";
 import { parseJobText } from "../../../lib/job-parser";
 import { JOB_PRIORITIES, RESUME_VERSIONS, type JobPriority, type ResumeVersion } from "../../../lib/job-workflow";
-import { getResumeProfileContent } from "../../../lib/resume-profile-server";
+import { getJobAnalysis, loadResumeProfiles, refreshJobAnalysis } from "../../../lib/resume-profile-server";
 
 const STATUSES = new Set(["未投递", "准备中", "已投递", "笔试", "面试", "Offer", "暂停"]);
 
@@ -33,7 +33,10 @@ export async function GET(request: Request) {
   if (auth.error) return auth.error;
   try {
     const rows = await getDb().select().from(jobs).where(eq(jobs.ownerId, auth.userId)).orderBy(asc(jobs.companyOrder), asc(jobs.jobOrder), desc(jobs.updatedAt), desc(jobs.id));
-    return Response.json({ jobs: rows.map(presentJob) });
+    const profiles = await loadResumeProfiles(auth.userId);
+    const presented = [];
+    for (const row of rows) presented.push(await refreshJobAnalysis(row, profiles));
+    return Response.json({ jobs: presented }, { headers: { "Cache-Control": "no-store" } });
   } catch (error) {
     return Response.json({ error: errorMessage(error) }, { status: 500 });
   }
@@ -59,8 +62,7 @@ export async function POST(request: Request) {
     const priority = JOB_PRIORITIES.includes(submittedPriority) ? submittedPriority : "中";
     const submittedResumeVersion = textValue(payload.resumeVersion, 40) as ResumeVersion;
     const resumeVersion = RESUME_VERSIONS.includes(submittedResumeVersion) ? submittedResumeVersion : "通用版";
-    const resumeContent = await getResumeProfileContent(auth.userId, resumeVersion);
-    const analysis = analyzeJob({ role, responsibilities, requirements, competencies, rawText, resumeVersion }, resumeContent);
+    const analysis = await getJobAnalysis(auth.userId, { role, responsibilities, requirements, competencies, rawText, resumeVersion });
     const prepChecklist = generatePrepChecklist(analysis);
     const now = new Date().toISOString();
     const orderingRows = await getDb().select({ company: jobs.company, companyOrder: jobs.companyOrder, jobOrder: jobs.jobOrder }).from(jobs).where(eq(jobs.ownerId, auth.userId));
@@ -97,7 +99,7 @@ export async function POST(request: Request) {
       createdAt: now,
       updatedAt: now,
     }).returning();
-    return Response.json({ job: presentJob(job) }, { status: 201 });
+    return Response.json({ job: await refreshJobAnalysis(job) }, { status: 201 });
   } catch (error) {
     return Response.json({ error: errorMessage(error) }, { status: 500 });
   }

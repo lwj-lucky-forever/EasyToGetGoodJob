@@ -99,7 +99,7 @@ export function ScheduleView({ jobs, onOpenDetail }: { jobs: WorkspaceJobView[];
 
 type ResumeProfile = { name: ResumeVersion; content: string; updatedAt: string };
 
-export function ResumeManagerDialog({ open, onOpenChange, onSaved }: { open: boolean; onOpenChange: (open: boolean) => void; onSaved?: (version: ResumeVersion) => Promise<number> }) {
+export function ResumeManagerDialog({ open, onOpenChange, onSaved }: { open: boolean; onOpenChange: (open: boolean) => void; onSaved?: () => Promise<boolean> }) {
   const [profiles, setProfiles] = useState<ResumeProfile[]>([]);
   const [selected, setSelected] = useState<ResumeVersion>("通用版");
   const [content, setContent] = useState("");
@@ -107,7 +107,23 @@ export function ResumeManagerDialog({ open, onOpenChange, onSaved }: { open: boo
   const [saving, setSaving] = useState(false);
   const [reading, setReading] = useState(false);
   const [fileName, setFileName] = useState("");
-  useEffect(() => { if (!open) return; setLoading(true); void fetch("/api/resumes", { cache: "no-store" }).then(async (response) => { const data = await response.json() as { profiles?: ResumeProfile[]; error?: string }; if (!response.ok || !data.profiles) throw new Error(data.error || "简历读取失败"); setProfiles(data.profiles); const current = data.profiles.find((item) => item.name === selected) ?? data.profiles[0]; if (current) { setSelected(current.name); setContent(current.content); } }).catch((error) => toast.error(error instanceof Error ? error.message : "简历读取失败")).finally(() => setLoading(false)); }, [open]);
+  const [applyToAllJobs, setApplyToAllJobs] = useState(true);
+  useEffect(() => {
+    if (!open) return;
+    let cancelled = false;
+    setLoading(true);
+    setFileName("");
+    void fetch("/api/resumes", { cache: "no-store" }).then(async (response) => {
+      const data = await response.json() as { profiles?: ResumeProfile[]; error?: string };
+      if (!response.ok || !data.profiles) throw new Error(data.error || "简历读取失败");
+      if (cancelled) return;
+      setProfiles(data.profiles);
+      const current = data.profiles.find((item) => item.name === selected) ?? data.profiles[0];
+      if (current) { setSelected(current.name); setContent(current.content); }
+    }).catch((error) => { if (!cancelled) toast.error(error instanceof Error ? error.message : "简历读取失败"); })
+      .finally(() => { if (!cancelled) setLoading(false); });
+    return () => { cancelled = true; };
+  }, [open]);
   function selectVersion(value: ResumeVersion) { setSelected(value); setContent(profiles.find((item) => item.name === value)?.content ?? ""); setFileName(""); }
   async function readFile(file?: File) {
     if (!file) return;
@@ -119,24 +135,25 @@ export function ResumeManagerDialog({ open, onOpenChange, onSaved }: { open: boo
   async function save() {
     setSaving(true);
     try {
-      const response = await fetch("/api/resumes", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: selected, content }) });
-      const data = await response.json() as { profile?: ResumeProfile; error?: string };
+      const response = await fetch("/api/resumes", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: selected, content, applyToAllJobs }) });
+      const data = await response.json() as { profile?: ResumeProfile; error?: string; updatedJobs?: number; refreshPending?: boolean };
       if (!response.ok || !data.profile) throw new Error(data.error || "简历保存失败");
       setProfiles((current) => current.map((item) => item.name === selected ? data.profile! : item));
-      if (onSaved) {
-        try { const count = await onSaved(selected); toast.success(`${selected}已保存，已更新 ${count} 个岗位的匹配分析`); }
-        catch { toast.warning(`${selected}已保存，但部分岗位更新失败；可在岗位匹配页点击“重新分析”`); }
-      } else toast.success(`${selected}已保存`);
+      let refreshed = true;
+      try { if (onSaved) refreshed = await onSaved(); } catch { refreshed = false; }
+      if (!refreshed || data.refreshPending) toast.warning(`${selected}已保存，部分分析仍待刷新；重新加载岗位后会自动重算`);
+      else toast.success(`${selected}已保存，已更新 ${data.updatedJobs ?? 0} 个岗位的匹配分析`);
     } catch (error) { toast.error(error instanceof Error ? error.message : "简历保存失败"); }
     finally { setSaving(false); }
   }
   return <Dialog open={open} onOpenChange={onOpenChange}><DialogContent className="[&>[data-slot=dialog-close]]:z-20 max-h-[92vh] overflow-y-auto rounded-[1.75rem] p-0 sm:max-w-3xl">
-    <DialogHeader className="border-b border-slate-100 px-6 py-5"><DialogTitle className="flex items-center gap-2"><ScrollText className="size-5 text-indigo-600" />上传简历</DialogTitle><DialogDescription>选择简历版本并上传 PDF。文字只在浏览器中提取，核对后保存，用于与该版本关联的岗位匹配。</DialogDescription></DialogHeader>
+    <DialogHeader className="border-b border-slate-100 px-6 py-5"><DialogTitle className="flex items-center gap-2"><ScrollText className="size-5 text-indigo-600" />上传简历</DialogTitle><DialogDescription>选择简历版本并上传 PDF。文字只在浏览器中提取，核对后点击“保存并匹配岗位”，分析才会使用新内容。</DialogDescription></DialogHeader>
     <div className="space-y-4 px-6 py-5">
       <Select value={selected} onValueChange={(value) => selectVersion(value as ResumeVersion)} disabled={loading || saving || reading}><SelectTrigger className="w-full"><SelectValue /></SelectTrigger><SelectContent>{RESUME_VERSIONS.map((name) => <SelectItem key={name} value={name}>{name}</SelectItem>)}</SelectContent></Select>
       <label className="flex cursor-pointer items-center gap-3 rounded-xl border border-dashed border-indigo-200 bg-indigo-50/60 px-4 py-3 text-sm font-medium text-indigo-700 hover:bg-indigo-50"><Upload className="size-5" /><span>{reading ? "正在读取 PDF…" : fileName || "选择 PDF 简历（最大 10 MB）"}</span><input type="file" accept=".pdf,application/pdf" disabled={loading || saving || reading} className="sr-only" onChange={(event) => { void readFile(event.target.files?.[0]); event.target.value = ""; }} /></label>
       <Textarea value={content} onChange={(event) => setContent(event.target.value)} disabled={loading || saving || reading} aria-label="提取的简历文字" placeholder="上传 PDF 后在这里核对提取内容；也可以直接粘贴简历文字。" className="min-h-[350px] resize-y text-base leading-7" />
-      <p className="text-xs leading-5 text-slate-500">保存会覆盖所选版本的原有文字，并更新使用该版本的岗位匹配度；扫描图片 PDF 需要先做文字识别。</p>
+      <label className="flex items-start gap-2 rounded-xl border border-indigo-100 bg-indigo-50/60 p-3 text-sm text-slate-700"><input type="checkbox" className="mt-1 accent-indigo-600" checked={applyToAllJobs} disabled={loading || saving || reading} onChange={(event) => setApplyToAllJobs(event.target.checked)} /><span>将这份简历用于全部现有岗位<span className="mt-1 block text-xs leading-5 text-slate-500">统一切换岗位的简历版本并重新匹配，不会删除其他已保存版本。取消勾选则保留各岗位的版本选择。</span></span></label>
+      <p className="text-xs leading-5 text-slate-500">保存会覆盖所选版本文字。岗位选择的版本未保存时，依次使用已保存的通用版、最近保存的版本；没有简历则提示上传。扫描图片 PDF 需先做文字识别。</p>
     </div>
     <DialogFooter className="border-t border-slate-100 px-6 py-4"><Button variant="outline" onClick={() => onOpenChange(false)} disabled={saving}>关闭</Button><Button onClick={() => void save()} disabled={loading || saving || reading || content.trim().length < 20} className="bg-indigo-600 hover:bg-indigo-700"><Save className="size-4" />{saving ? "保存并匹配中…" : "保存并匹配岗位"}</Button></DialogFooter>
   </DialogContent></Dialog>;

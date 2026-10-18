@@ -1,16 +1,23 @@
-import type { ResumeVersion } from "./job-workflow";
+import { RESUME_VERSIONS, type ResumeVersion } from "./job-workflow.ts";
 
-export const DEFAULT_RESUME_PROFILES: Record<ResumeVersion, string> = {
-  通用版: "刘尉婕，北京航空航天大学航空相关方向硕士在读，研究生成绩排名6/74。具备航空应急救援、无人机/eVTOL、MBSE、任务规划与仿真、效能评估、需求调研、Python、SQL、机器学习、结构化写作、课程助教、研学带队和跨单位沟通经验。",
-  产品版: "刘尉婕，北京航空航天大学航空相关方向硕士在读，研究生成绩排名6/74。产品方向重点经历包括需求调研、用户沟通、救援任务流程建模、系统功能梳理、Prompt结构化提取、项目推进、效能评估和结构化文档撰写；具备Python、SQL和机器学习基础。",
-  运营版: "刘尉婕，北京航空航天大学航空相关方向硕士在读，研究生成绩排名6/74。运营方向重点经历包括延世大学研学带队、课程助教、内容材料撰写、跨组织协调、活动执行、反馈闭环和科研项目推进；具有良好的沟通、协作与执行能力。",
-  数据分析版: "刘尉婕，北京航空航天大学航空相关方向硕士在读，研究生成绩排名6/74。数据分析方向重点经历包括Python、SQL、机器学习、仿真样本处理、指标体系设计、AHP与CRITIC权重计算、效能评估、Excel和数据可视化。",
-  航空专业版: "刘尉婕，北京航空航天大学航空相关方向硕士在读，研究生成绩排名6/74。航空方向重点经历包括航空应急救援、无人机/eVTOL、MBSE、任务规划与仿真、装备效能评估、航空医疗救援，以及与制造商和一线用户沟通调研。",
-};
+export type ResumeProfile = { name: string; content: string; updatedAt: string };
+export type ResumeSource = { name: ResumeVersion | null; content: string; updatedAt: string };
+
+// Only user-saved text participates in matching. Empty versions are not sample resumes.
+export function resolveResumeProfile(profiles: ResumeProfile[], version: string): ResumeSource {
+  const saved = profiles.filter((profile) => RESUME_VERSIONS.includes(profile.name as ResumeVersion) && profile.content.trim());
+  const selected = saved.find((profile) => profile.name === version)
+    ?? saved.find((profile) => profile.name === "通用版")
+    ?? [...saved].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt) || a.name.localeCompare(b.name))[0];
+  return selected
+    ? { name: selected.name as ResumeVersion, content: selected.content.trim(), updatedAt: selected.updatedAt }
+    : { name: null, content: "", updatedAt: "" };
+}
 
 export const RESUME_MATCH_TERMS = [
-  "本科", "硕士", "研究生", "学历", "计算机", "设计", "心理学", "逻辑", "结构化", "分析", "写作", "文档", "报告", "PPT",
+  "本科", "硕士", "研究生", "博士", "专科", "学历", "计算机", "设计", "心理学", "逻辑", "结构化", "分析", "写作", "文档", "报告", "PPT",
   "AI", "人工智能", "大模型", "Prompt", "机器学习", "产品", "需求", "用户", "PRD", "原型", "Figma", "Axure", "调研", "沟通", "协调",
   "跨部门", "责任心", "自驱", "抗压", "执行", "Python", "SQL", "Excel", "Office", "数据", "统计", "项目管理", "英语", "雅思",
   "航空", "航天", "无人机", "eVTOL", "应急救援", "仿真", "MBSE", "运营", "增长", "活动", "内容", "推广", "供应链", "电商", "零售",
+  "Java", "JavaScript", "TypeScript", "React", "算法", "编程", "数据结构", "前端", "后端", "Git", "访谈", "竞品", "留存", "转化",
 ] as const;
