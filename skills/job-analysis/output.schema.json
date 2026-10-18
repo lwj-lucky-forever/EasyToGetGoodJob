@@ -1,0 +1,65 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Job analysis skill output v1.0.0",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["summary", "core_responsibilities", "must_have", "nice_to_have", "implicit_requirements", "skills", "constraints", "top_hiring_signals", "uncertainties"],
+  "properties": {
+    "summary": { "type": "string", "maxLength": 1000 },
+    "core_responsibilities": { "type": "array", "maxItems": 20, "items": { "$ref": "#/$defs/claim" } },
+    "must_have": { "type": "array", "maxItems": 30, "items": { "$ref": "#/$defs/explicitClaim" } },
+    "nice_to_have": { "type": "array", "maxItems": 20, "items": { "$ref": "#/$defs/explicitClaim" } },
+    "implicit_requirements": { "type": "array", "maxItems": 15, "items": { "$ref": "#/$defs/inferredClaim" } },
+    "skills": { "type": "array", "maxItems": 30, "items": { "$ref": "#/$defs/claim" } },
+    "constraints": {
+      "type": "object", "additionalProperties": false,
+      "required": ["education", "major", "city", "internship_duration", "weekly_attendance", "language", "experience", "salary", "start_date", "recruitment_type"],
+      "properties": {
+        "education": { "$ref": "#/$defs/constraint" },
+        "major": { "$ref": "#/$defs/constraint" },
+        "city": { "$ref": "#/$defs/constraint" },
+        "internship_duration": { "$ref": "#/$defs/constraint" },
+        "weekly_attendance": { "$ref": "#/$defs/constraint" },
+        "language": { "$ref": "#/$defs/constraint" },
+        "experience": { "$ref": "#/$defs/constraint" },
+        "salary": { "$ref": "#/$defs/constraint" },
+        "start_date": { "$ref": "#/$defs/constraint" },
+        "recruitment_type": { "$ref": "#/$defs/constraint" }
+      }
+    },
+    "top_hiring_signals": { "type": "array", "maxItems": 5, "items": { "$ref": "#/$defs/claim" } },
+    "uncertainties": { "type": "array", "maxItems": 30, "items": { "$ref": "#/$defs/uncertainty" } }
+  },
+  "$defs": {
+    "evidence": {
+      "type": "object", "additionalProperties": false,
+      "required": ["source_field", "quote"],
+      "properties": {
+        "source_field": { "type": "string", "enum": ["company", "role", "location", "nature", "responsibilities", "requirements", "competencies", "sourceUrl", "applicationDeadline", "rawText"] },
+        "quote": { "type": "string", "minLength": 1, "maxLength": 2000 }
+      }
+    },
+    "claim": {
+      "type": "object", "additionalProperties": false,
+      "required": ["text", "basis", "reason", "evidence"],
+      "properties": {
+        "text": { "type": "string", "minLength": 1, "maxLength": 1000 },
+        "basis": { "type": "string", "enum": ["explicit", "inferred"] },
+        "reason": { "type": "string", "minLength": 1, "maxLength": 1000 },
+        "evidence": { "type": "array", "minItems": 1, "maxItems": 5, "items": { "$ref": "#/$defs/evidence" } }
+      }
+    },
+    "explicitClaim": { "allOf": [{ "$ref": "#/$defs/claim" }, { "properties": { "basis": { "enum": ["explicit"] } } }] },
+    "inferredClaim": { "allOf": [{ "$ref": "#/$defs/claim" }, { "properties": { "basis": { "enum": ["inferred"] } } }] },
+    "constraint": { "anyOf": [{ "type": "null" }, { "$ref": "#/$defs/explicitClaim" }] },
+    "uncertainty": {
+      "type": "object", "additionalProperties": false,
+      "required": ["field", "reason", "evidence"],
+      "properties": {
+        "field": { "type": "string", "minLength": 1, "maxLength": 100 },
+        "reason": { "type": "string", "minLength": 1, "maxLength": 1000 },
+        "evidence": { "type": "array", "maxItems": 5, "items": { "$ref": "#/$defs/evidence" } }
+      }
+    }
+  }
+}
